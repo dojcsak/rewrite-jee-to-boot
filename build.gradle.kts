@@ -5,6 +5,8 @@ plugins {
     // If you are operating in an environment where public repositories are not accessible, we recommend using a
     // virtual repository which mirrors both maven central and nexus snapshots.
     id("org.openrewrite.build.recipe-repositories") version "latest.release"
+
+    id("maven-publish")
 }
 
 group = "hu.dojcsak.openrewrite.recipe"
@@ -53,6 +55,39 @@ dependencies {
 
     // Need to have a slf4j binding to see any output enabled from the parser.
     runtimeOnly("ch.qos.logback:logback-classic:latest.release")
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+            versionMapping {
+                usage("java-api") {
+                    fromResolutionOf("runtimeClasspath")
+                }
+                usage("java-runtime") {
+                    fromResolutionResult()
+                }
+            }
+        }
+    }
+    repositories {
+        // ./gradlew publishToMavenLocal
+        mavenLocal()
+        // ./gradlew publish -PnexusUrl=https://nexus.example.com/repository/snapshots
+        if (project.hasProperty("nexusUrl")) {
+            maven {
+                name = "nexus"
+                url = uri(project.property("nexusUrl") as String)
+                if (project.hasProperty("nexusUsername") && project.hasProperty("nexusPassword")) {
+                    credentials {
+                        username = project.property("nexusUsername") as String
+                        password = project.property("nexusPassword") as String
+                    }
+                }
+            }
+        }
+    }
 }
 
 tasks.withType<JavaCompile> {
