@@ -15,6 +15,10 @@ recipeDependencies {
     parserClasspath("org.jspecify:jspecify:1.0.0")
 }
 
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 dependencies {
     // The bom version can also be set to a specific version
     // https://github.com/openrewrite/rewrite-recipe-bom/releases
@@ -28,7 +32,8 @@ dependencies {
 
     // Refaster style recipes need the rewrite-templating annotation processor and dependency for generated recipes
     // https://github.com/openrewrite/rewrite-templating/releases
-    annotationProcessor("org.openrewrite:rewrite-templating:latest.release")
+    annotationProcessor(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
+    annotationProcessor("org.openrewrite:rewrite-templating")
     implementation("org.openrewrite:rewrite-templating")
     // The `@BeforeTemplate` and `@AfterTemplate` annotations are needed for refaster style recipes
     compileOnly("com.google.errorprone:error_prone_core:latest.release") {
@@ -40,7 +45,6 @@ dependencies {
     testImplementation("org.openrewrite:rewrite-test") {
         exclude(group = "org.slf4j", module = "slf4j-nop")
     }
-    testImplementation("org.assertj:assertj-core:latest.release")
 
     // Support for parsing different Java versions
     testRuntimeOnly("org.openrewrite:rewrite-java-17")
@@ -48,7 +52,7 @@ dependencies {
     testRuntimeOnly("org.openrewrite:rewrite-java-25")
 
     // Need to have a slf4j binding to see any output enabled from the parser.
-    runtimeOnly("ch.qos.logback:logback-classic:1.5.+")
+    runtimeOnly("ch.qos.logback:logback-classic:latest.release")
 }
 
 tasks.withType<JavaCompile> {
