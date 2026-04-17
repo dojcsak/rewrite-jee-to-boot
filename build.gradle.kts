@@ -15,6 +15,8 @@ description = "JEE to Spring Boot rewrite recipes"
 
 recipeDependencies {
     parserClasspath("org.jspecify:jspecify:1.0.0")
+    parserClasspath("javax.ejb:javax.ejb-api:3.2.2")
+    parserClasspath("javax.inject:javax.inject:1")
 }
 
 dependencyLocking {
@@ -27,6 +29,7 @@ dependencies {
     implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
 
     implementation("org.openrewrite:rewrite-java")
+    implementation("org.openrewrite:rewrite-maven")
     implementation("org.openrewrite.recipe:rewrite-java-dependencies")
     implementation("org.openrewrite:rewrite-yaml")
     implementation("org.openrewrite:rewrite-xml")
@@ -41,12 +44,24 @@ dependencies {
         exclude(group = "org.slf4j", module = "slf4j-nop")
     }
 
+    // JEE types needed by the parser in tests
+    testRuntimeOnly("javax.ejb:javax.ejb-api:3.2.2")
+    testRuntimeOnly("javax.inject:javax.inject:1")
+    testRuntimeOnly("javax.persistence:javax.persistence-api:2.2")
+
+    // Spring 5.3.x types needed by JavaTemplate at recipe runtime — targets Spring Boot 2.7.x
+    // (runtimeOnly covers test runtime too)
+    runtimeOnly("org.springframework:spring-beans:5.3.+")
+    runtimeOnly("org.springframework:spring-context:5.3.+")
+    runtimeOnly("org.springframework:spring-tx:5.3.+")
+
     // Support for parsing different Java versions
     testRuntimeOnly("org.openrewrite:rewrite-java-17")
     testRuntimeOnly("org.openrewrite:rewrite-java-21")
     testRuntimeOnly("org.openrewrite:rewrite-java-25")
 
-    // Need to have a slf4j binding to see any output enabled from the parser.
+    // SLF4J API needed at compile time for @Slf4j (Lombok); binding provided at runtime
+    compileOnly("org.slf4j:slf4j-api:latest.release")
     runtimeOnly("ch.qos.logback:logback-classic:latest.release")
 }
 
@@ -81,6 +96,14 @@ publishing {
             }
         }
     }
+}
+
+tasks.named<Delete>("clean") {
+    delete("src/main/resources/META-INF/rewrite/classpath")
+}
+
+tasks.named("processResources") {
+    dependsOn(tasks.named("downloadRecipeDependencies"))
 }
 
 tasks.withType<JavaCompile> {
