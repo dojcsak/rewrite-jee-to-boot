@@ -17,6 +17,7 @@ recipeDependencies {
     parserClasspath("org.jspecify:jspecify:1.0.0")
     parserClasspath("javax.ejb:javax.ejb-api:3.2.2")
     parserClasspath("javax.inject:javax.inject:1")
+    parserClasspath("javax.persistence:javax.persistence-api:2.2")
 }
 
 dependencyLocking {
@@ -33,6 +34,7 @@ dependencies {
     implementation("org.openrewrite.recipe:rewrite-java-dependencies")
     implementation("org.openrewrite:rewrite-yaml")
     implementation("org.openrewrite:rewrite-xml")
+    implementation("org.openrewrite:rewrite-properties")
     implementation("org.openrewrite.meta:rewrite-analysis")
 
     // Provides JavaTemplate.builder() used at runtime in imperative recipes.
