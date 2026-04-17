@@ -15,6 +15,7 @@ description = "JEE to Spring Boot rewrite recipes"
 
 recipeDependencies {
     parserClasspath("org.jspecify:jspecify:1.0.0")
+    parserClasspath("javax.annotation:javax.annotation-api:1.3.2")
     parserClasspath("javax.ejb:javax.ejb-api:3.2.2")
     parserClasspath("javax.inject:javax.inject:1")
     // Spring types needed by JavaTemplate at recipe runtime — embedded in META-INF/rewrite/classpath/
@@ -57,6 +58,7 @@ dependencies {
     }
 
     // JEE types needed by the parser in tests
+    testRuntimeOnly("javax.annotation:javax.annotation-api:1.3.2")
     testRuntimeOnly("javax.ejb:javax.ejb-api:3.2.2")
     testRuntimeOnly("javax.inject:javax.inject:1")
     testRuntimeOnly("javax.persistence:javax.persistence-api:2.2")

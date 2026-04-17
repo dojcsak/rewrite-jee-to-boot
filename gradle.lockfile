@@ -28,6 +28,7 @@ io.moderne:jsonrpc:1.0.10=runtimeClasspath,testRuntimeClasspath
 io.moderne:jsonrpc:1.1.0-SNAPSHOT=cliCompatRuntimeClasspath
 io.quarkus.gizmo:gizmo:1.0.11.Final=cliCompatRuntimeClasspath,runtimeClasspath,testRuntimeClasspath
 jakarta.activation:jakarta.activation-api:1.2.2=cliCompatRuntimeClasspath,runtimeClasspath,testRuntimeClasspath
+javax.annotation:javax.annotation-api:1.3.2=testRuntimeClasspath
 javax.ejb:javax.ejb-api:3.2.2=testRuntimeClasspath
 javax.inject:javax.inject:1=testRuntimeClasspath
 javax.persistence:javax.persistence-api:2.2=testRuntimeClasspath
