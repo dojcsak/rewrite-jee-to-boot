@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: 0 17 * * THU
 
+permissions:
+  contents: write
+
 jobs:
   bump-releases:
     timeout-minutes: 30
@@ -23,8 +26,8 @@ jobs:
           settings-path: ${{ github.workspace }}
       - name: configure-git-user
         run: |
-          git config user.email "team@moderne.io"
-          git config user.name "team-moderne[bot]"
+          git config user.email "dojsak.sandor@gmail.com"
+          git config user.name "github-actions[bot]"
 
       - name: maven-versions-use-latest-releases
         run: |
