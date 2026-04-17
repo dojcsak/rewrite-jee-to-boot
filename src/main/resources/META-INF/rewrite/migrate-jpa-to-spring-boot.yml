@@ -1,0 +1,59 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: hu.dojcsak.openrewrite.recipe.MigrateJpaToSpringBoot
+displayName: Migrate JPA to Spring Boot
+description: >-
+  Migrates JPA configuration to Spring Boot 2.7.x.
+  Extracts JPA/Hibernate properties from persistence.xml, maps them to Spring Boot
+  application.properties equivalents (creating the file if necessary), and deletes persistence.xml.
+  Properties with no automatic mapping (e.g. JNDI data sources, cache providers) are skipped.
+  Adds spring-boot-starter-data-jpa and H2 runtime dependency (only if javax.persistence.* is used).
+  Removes explicit Hibernate dependencies (hibernate-core, hibernate-entitymanager, hibernate,
+  hibernate-hikaricp, ejb3-persistence, hibernate-jpa-2.1-api, openejb-core-hibernate,
+  com.oracle.weblogic.persistence) that are transitively managed by the starter.
+  Adds @Transactional to @Service beans as a replacement for EJB Container-Managed Transactions (CMT).
+  Removes the unitName attribute from @PersistenceContext annotations, as Spring Boot uses
+  a single default persistence unit.
+tags:
+  - jee
+  - jpa
+  - spring-boot
+recipeList:
+  # 1. Migrate persistence.xml → application.properties (also deletes persistence.xml)
+  - hu.dojcsak.openrewrite.recipe.jee.jpa.MigratePersistenceXmlToApplicationProperties
+
+  # 2. Add Spring Boot JPA starter and H2 runtime dependency (indent-aware, bypasses autoFormat)
+  - hu.dojcsak.openrewrite.recipe.jee.jpa.AddJpaStarterDependencies
+
+  # 3. Remove explicit Hibernate dependencies (transitively managed by the starter)
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.hibernate
+      artifactId: hibernate-core
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.hibernate
+      artifactId: hibernate-entitymanager
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.hibernate
+      artifactId: hibernate
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.hibernate
+      artifactId: hibernate-hikaricp
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.hibernate
+      artifactId: ejb3-persistence
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.hibernate.javax.persistence
+      artifactId: hibernate-jpa-2.1-api
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.apache.tomee
+      artifactId: openejb-core-hibernate
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: com.oracle.weblogic
+      artifactId: com.oracle.weblogic.persistence
+
+  # 5. Add @Transactional to @Service beans as replacement for EJB CMT
+  - hu.dojcsak.openrewrite.recipe.jee.ejb.AddTransactionalToServiceBeans
+
+  # 6. Remove unitName from @PersistenceContext (Spring Boot uses a single default unit)
+  - org.openrewrite.java.RemoveAnnotationAttribute:
+      annotationType: javax.persistence.PersistenceContext
+      attributeName: unitName

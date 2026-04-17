@@ -22,6 +22,7 @@ recipeDependencies {
     parserClasspath("org.springframework:spring-beans:5.3.39")
     parserClasspath("org.springframework:spring-context:5.3.39")
     parserClasspath("org.springframework:spring-tx:5.3.39")
+    parserClasspath("javax.persistence:javax.persistence-api:2.2")
 }
 
 dependencyLocking {
@@ -38,6 +39,7 @@ dependencies {
     implementation("org.openrewrite.recipe:rewrite-java-dependencies")
     implementation("org.openrewrite:rewrite-yaml")
     implementation("org.openrewrite:rewrite-xml")
+    implementation("org.openrewrite:rewrite-properties")
     implementation("org.openrewrite.meta:rewrite-analysis")
 
     // Provides JavaTemplate.builder() used at runtime in imperative recipes.
