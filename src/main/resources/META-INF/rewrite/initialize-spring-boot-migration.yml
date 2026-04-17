@@ -1,0 +1,87 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: hu.dojcsak.openrewrite.recipe.InitializeSpringBootMigration
+displayName: Initialize Spring Boot migration
+description: >-
+  Prepares a JEE Maven project for migration to Spring Boot 2.7.18.
+  Imports the Spring Boot BOM (spring-boot-dependencies 2.7.18) into the root pom's dependencyManagement.
+  Removes Spring Framework dependencies (spring-core, spring-context, spring-beans, spring-expression,
+  spring-aop) and test libraries (assertj-core, mockito-core, mockito-junit-jupiter, hamcrest,
+  junit-jupiter, junit, xmlunit-core) that are transitively managed by the Boot starters.
+  Adds spring-boot-starter, spring-boot-starter-test, and configures spring-boot-maven-plugin;
+  changes packaging from war/ear to jar for target modules.
+  Removes maven-ear-plugin from target module build/plugins and from the root pom's pluginManagement
+  (the EAR assembly configuration is obsolete after the packaging change).
+  In single-module projects everything goes to the single pom.
+  In multi-module projects the Spring Boot plugin version is managed from the root pom's pluginManagement,
+  and starters plus plugin activation are added only to ear modules and war modules that are
+  not listed as a dependency in any ear module.
+  Generates SpringBootApp.java, SpringBootAppTest.java, and application.properties
+  in the target modules when these files are absent.
+tags:
+  - jee
+  - spring-boot
+recipeList:
+  # 1. Remove Spring Framework dependencies now managed by the BOM
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.springframework
+      artifactId: spring-core
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.springframework
+      artifactId: spring-context
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.springframework
+      artifactId: spring-beans
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.springframework
+      artifactId: spring-expression
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.springframework
+      artifactId: spring-aop
+
+  # 3. Remove test libraries now pulled in transitively by spring-boot-starter-test
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.assertj
+      artifactId: assertj-core
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.mockito
+      artifactId: mockito-core
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.mockito
+      artifactId: mockito-junit-jupiter
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.hamcrest
+      artifactId: hamcrest
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.junit.jupiter
+      artifactId: junit-jupiter
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.junit.jupiter
+      artifactId: junit-jupiter-api
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.junit.jupiter
+      artifactId: junit-jupiter-engine
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.junit.jupiter
+      artifactId: junit-jupiter-params
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: junit
+      artifactId: junit
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.xmlunit
+      artifactId: xmlunit-core
+
+  # 4. Add spring-boot-starter, spring-boot-starter-test and configure spring-boot-maven-plugin.
+  #    Single-module: everything in the single pom (plugin with version).
+  #    Multi-module:
+  #      - root pom: plugin in <pluginManagement> (version defined here)
+  #      - ear modules + war modules not pulled into an ear: starters + plugin activation
+  - hu.dojcsak.openrewrite.recipe.boot.ConfigureSpringBootMaven:
+      springBootVersion: 2.7.18
+
+  # 5. Generate SpringBootApp.java, SpringBootAppTest.java, application.properties.
+  #    Uses the same ear/war module targeting logic as step 4.
+  - hu.dojcsak.openrewrite.recipe.boot.AddSpringBootApplicationFiles
+
+  # 6. Packaging change (war/ear → jar) is handled directly by ConfigureSpringBootMaven
+  #    so that only Spring Boot target modules (ear modules + standalone war modules)
+  #    are affected. War modules that are dependencies of an ear module are excluded.
