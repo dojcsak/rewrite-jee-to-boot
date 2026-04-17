@@ -1,0 +1,14 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: hu.dojcsak.openrewrite.recipe.MarkRemoteEjbs
+displayName: Mark @Remote EJB interfaces and beans for manual REST migration
+description: >-
+  Removes @javax.ejb.Remote from classes and interfaces, adds a TODO comment
+  (including the original annotation text) to flag them for manual REST API migration,
+  and logs a WARN message with the file path for each affected component.
+  Remote EJB interfaces expose distributed business logic that cannot be automatically
+  migrated and should be replaced with a REST API (e.g. Spring @RestController).
+tags:
+  - jee
+  - ejb
+recipeList:
+  - hu.dojcsak.openrewrite.recipe.jee.ejb.MarkRemoteEjbs
