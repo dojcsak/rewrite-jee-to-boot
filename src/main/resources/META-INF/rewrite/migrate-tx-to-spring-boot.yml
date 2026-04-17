@@ -1,0 +1,16 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: hu.dojcsak.openrewrite.recipe.MigrateTxToSpringBoot
+displayName: Migrate JEE transaction annotations to Spring Boot
+description: >-
+  Migrates JEE transaction annotations to their Spring equivalents on both class and method level.
+  Removes @TransactionManagement (Spring Boot manages transactions via AOP).
+  Replaces @TransactionAttribute with @Transactional, mapping TransactionAttributeType values
+  to Spring Propagation. REQUIRED is omitted from the generated @Transactional as it is the
+  Spring default. If an existing @Transactional is present on the class alongside
+  @TransactionAttribute, it is removed and replaced by the mapped one.
+tags:
+  - jee
+  - ejb
+  - spring-boot
+recipeList:
+  - hu.dojcsak.openrewrite.recipe.jee.tx.MigrateTransactionAnnotations
