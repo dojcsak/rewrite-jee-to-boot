@@ -1,0 +1,57 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: hu.dojcsak.openrewrite.recipe.MigrateStatelessEjb
+displayName: Migrate stateless EJB to Spring Boot
+description: >-
+  Migrates stateless EJB components to Spring Boot 2.7.x services.
+  Replaces @EJB field/setter injection with @Autowired (adding @Qualifier when beanName is present),
+  replaces @Stateless/@Singleton with @Service, removes EJB-specific annotations
+  (@Local, @LocalBean, @Startup), replaces javax.inject.@Inject with @Autowired,
+  adds @Transactional to @Service classes as a replacement for Container-Managed Transactions (CMT),
+  removes EJB build dependencies (javaee-api, javax.ejb-api, jboss-ejb-api, weblogic javaee-api),
+  and adds Spring Boot 2.7.x starters (spring-boot-starter and spring-boot-starter-data-jpa where applicable).
+tags:
+  - jee
+  - ejb
+  - spring-boot
+recipeList:
+  # 1. Replace @EJB field/setter injection with @Autowired (+@Qualifier if beanName present)
+  - hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateEjbAnnotations
+
+  # 2. Replace @Stateless/@Singleton with @Service, remove @Local/@LocalBean/@Startup
+  - hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateStatelessSessionBeans
+
+  # 3. Replace javax.inject.@Inject with @Autowired
+  - org.openrewrite.java.ChangeType:
+      oldFullyQualifiedTypeName: javax.inject.Inject
+      newFullyQualifiedTypeName: org.springframework.beans.factory.annotation.Autowired
+
+  # 4. Add @Transactional to @Service classes as replacement for EJB CMT
+  - hu.dojcsak.openrewrite.recipe.jee.ejb.AddTransactionalToServiceBeans
+
+  # 5. Remove EJB build dependencies
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: javax
+      artifactId: javaee-api
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: javax.ejb
+      artifactId: javax.ejb-api
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.jboss.spec.javax.ejb
+      artifactId: "jboss-ejb-api_3*"
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: com.oracle.weblogic
+      artifactId: javax.javaee-api
+
+  # 6. Add Spring Boot 2.7.x core starter (only if javax.ejb.* is used)
+  - org.openrewrite.java.dependencies.AddDependency:
+      groupId: org.springframework.boot
+      artifactId: spring-boot-starter
+      version: 2.7.18
+      onlyIfUsing: "javax.ejb.*"
+
+  # 7. Add Spring Boot JPA starter (EJBs typically relied on container-managed JPA)
+  - org.openrewrite.java.dependencies.AddDependency:
+      groupId: org.springframework.boot
+      artifactId: spring-boot-starter-data-jpa
+      version: 2.7.18
+      onlyIfUsing: "javax.persistence.*"
