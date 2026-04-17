@@ -13,8 +13,8 @@ plugins {
 }
 
 // Set as appropriate for your organization
-group = "com.yourorg"
-description = "Rewrite recipes."
+group = "hu.dojcsak.openrewrite.recipe"
+description = "JEE to Spring Boot rewrite recipes"
 
 recipeDependencies {
     parserClasspath("org.jspecify:jspecify:1.0.0")
