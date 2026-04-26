@@ -91,5 +91,14 @@ publishing {
 }
 
 tasks.withType<JavaCompile> {
+    options.encoding = "UTF-8"
+}
+
+tasks.named<JavaCompile>("compileJava") {
+    // Suppress "source/target value 8 is obsolete" from the recipe-library-base plugin's --release 8.
+    options.compilerArgs.add("-Xlint:-options")
+    // Tells rewrite-templating where to load the parser classpath from (needed for compileJava only).
+    // Note: TemplateProcessor uses this option but doesn't declare it via @SupportedOptions — known
+    // upstream issue in rewrite-templating; the option functions correctly despite the warning.
     options.compilerArgs.add("-Arewrite.javaParserClasspathFrom=resources")
 }
