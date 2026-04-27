@@ -32,16 +32,9 @@ dependencies {
     implementation("org.openrewrite:rewrite-xml")
     implementation("org.openrewrite.meta:rewrite-analysis")
 
-    // Refaster style recipes need the rewrite-templating annotation processor and dependency for generated recipes
-    // https://github.com/openrewrite/rewrite-templating/releases
-    annotationProcessor(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
-    annotationProcessor("org.openrewrite:rewrite-templating")
+    // Provides JavaTemplate.builder() used at runtime in imperative recipes.
+    // No Refaster templates (@BeforeTemplate/@AfterTemplate) in this project, so no annotationProcessor needed.
     implementation("org.openrewrite:rewrite-templating")
-    // The `@BeforeTemplate` and `@AfterTemplate` annotations are needed for refaster style recipes
-    compileOnly("com.google.errorprone:error_prone_core:latest.release") {
-        exclude("com.google.auto.service", "auto-service-annotations")
-        exclude("io.github.eisop","dataflow-errorprone")
-    }
 
     // The RewriteTest class needed for testing recipes
     testImplementation("org.openrewrite:rewrite-test") {
@@ -97,8 +90,4 @@ tasks.withType<JavaCompile> {
 tasks.named<JavaCompile>("compileJava") {
     // Suppress "source/target value 8 is obsolete" from the recipe-library-base plugin's --release 8.
     options.compilerArgs.add("-Xlint:-options")
-    // Tells rewrite-templating where to load the parser classpath from (needed for compileJava only).
-    // Note: TemplateProcessor uses this option but doesn't declare it via @SupportedOptions — known
-    // upstream issue in rewrite-templating; the option functions correctly despite the warning.
-    options.compilerArgs.add("-Arewrite.javaParserClasspathFrom=resources")
 }
