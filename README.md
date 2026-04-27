@@ -1,100 +1,85 @@
-# Rewrite recipe starter
+# rewrite-jee-to-boot
 
-This repository serves as a template for building your own recipe JARs and publishing them to a repository where they can be applied on [app.moderne.io](https://app.moderne.io) against all the public OSS code that is included there.
+OpenRewrite recipes for migrating stateless EJB components to Spring Boot 2.7.x.
 
-We've provided a sample recipe (NoGuavaListsNewArray) and a sample test class. Both of these exist as placeholders, and they should be replaced by whatever recipe you are interested in writing.
+## Recipe: `hu.dojcsak.openrewrite.recipe.MigrateStatelessEjb`
 
-To begin, fork this repository and customize it by:
+A composite recipe that automates the migration of stateless EJB components to Spring Boot 2.7.x.
+It runs the following steps in order:
 
-1. Changing the root project name in `settings.gradle.kts`.
-2. Changing the `group` in `build.gradle.kts`.
-3. Changing the package structure from `com.yourorg` to whatever you want.
+### 1. Replace `@EJB` injection with `@Autowired`
 
-## Getting started
+Replaces `@EJB` on fields and setter methods with Spring `@Autowired`.
 
-Familiarize yourself with the [OpenRewrite documentation](https://docs.openrewrite.org/), in particular the [concepts & explanations](https://docs.openrewrite.org/concepts-explanations) op topics like the [lossless semantic trees](https://docs.openrewrite.org/concepts-and-explanations/lossless-semantic-trees), [recipes](https://docs.openrewrite.org/concepts-and-explanations/recipes), [traits](https://docs.openrewrite.org/concepts-and-explanations/traits) and [visitors](https://docs.openrewrite.org/concepts-and-explanations/visitors).
+- If `beanName` is set on `@EJB`, a corresponding `@Qualifier("name")` is added.
+- If `lookup` is set, the annotation cannot be automatically migrated — a `// TODO:` comment is added instead.
 
-You might be interested to watch some of the [videos available on OpenRewrite and Moderne](https://www.youtube.com/@moderne-and-openrewrite).
+### 2. Replace session bean annotations with `@Service`
 
-Once you want to dive into the code there is a [comprehensive getting started guide](https://docs.openrewrite.org/authoring-recipes/recipe-development-environment)
-available in the OpenRewrite docs that provides more details than the below README.
+- `@Stateless` and `@Singleton` → `@Service` (the `name` attribute is preserved as `@Service("name")`).
+- Removes `@Local`, `@LocalBean`, and `@Startup` from bean classes.
+- Removes `@Local` from business interfaces.
+- **Skips** beans annotated with `@Remote` or implementing a `@Remote` interface — marks them with a search result comment requesting manual migration.
 
-## Reference recipes
+### 3. Replace `javax.inject.@Inject` with `@Autowired`
 
-* [META-INF/rewrite/stringutils.yml](./src/main/resources/META-INF/rewrite/stringutils.yml) - A declarative YAML recipe that replaces usages of `org.springframework.util.StringUtils` with `org.apache.commons.lang3.StringUtils`.
-  * [UseApacheStringUtilsTest](./src/test/java/com/yourorg/UseApacheStringUtilsTest.java) - A test class for the `com.yourorg.UseApacheStringUtils` recipe.
-* [NoGuavaListsNewArrayList.java](./src/main/java/com/yourorg/NoGuavaListsNewArrayList.java) - An imperative Java recipe that replaces usages of `com.google.common.collect.Lists` with `new ArrayList<>()`.
-  * [NoGuavaListsNewArrayListTest.java](./src/test/java/com/yourorg/NoGuavaListsNewArrayListTest.java) - A test class for the `NoGuavaListsNewArrayList` recipe.
-* [SimplifyTernary](./src/main/java/com/yourorg/SimplifyTernary.java) - An Refaster style recipe that simplifies ternary expressions.
-  * [SimplifyTernaryTest](./src/test/java/com/yourorg/SimplifyTernaryTest.java) - A test class for the `SimplifyTernary` recipe.
-* [EqualsAvoidsNull](./src/main/java/com/yourorg/EqualsAvoidsNull.java) - A Refaster recipe that ensures `equals()` method calls avoid null pointer exceptions by calling equals on literals, by using `@Matches` on parameters.
-  * [EqualsAvoidsNullTest](./src/test/java/com/yourorg/EqualsAvoidsNullTest.java) - A test class for the `EqualsAvoidsNull` recipe.
-* [AssertEqualsToAssertThat](./src/main/java/com/yourorg/AssertEqualsToAssertThat.java) - An imperative Java recipe that replaces JUnit's `assertEquals` with AssertJ's `assertThat`, to show how to handle classpath dependencies.
-  * [AssertEqualsToAssertThatTest](./src/test/java/com/yourorg/AssertEqualsToAssertThatTest.java) - A test class for the `AssertEqualsToAssertThat` recipe.
-* [AppendToReleaseNotes](./src/main/java/com/yourorg/AppendToReleaseNotes.java) - A ScanningRecipe that appends a message to the release notes of a project.
-  * [AppendToReleaseNotesTest](./src/test/java/com/yourorg/AppendToReleaseNotesTest.java) - A test class for the `AppendToReleaseNotes` recipe.
-* [FindSpringBeans](./src/main/java/com/yourorg/FindSpringBeans.java) - A recipe that demonstrates how to use Traits to produce a data table on Spring `@Bean`s in a project.
-  * [FindSpringBeansTest](./src/test/java/com/yourorg/FindSpringBeansTest.java) - A test class for the `FindSpringBeans` recipe.
-* [ClassHierarchy](./src/main/java/com/yourorg/ClassHierarchy.java) - A recipe that demonstrates how to produce a data table on the class hierarchy of a project.
-  * [ClassHierarchyTest](./src/test/java/com/yourorg/ClassHierarchyTest.java) - A test class for the `ClassHierarchy` recipe.
-* [UpdateConcoursePipeline](./src/main/java/com/yourorg/UpdateConcoursePipeline.java) - A recipe that demonstrates how to update a Concourse pipeline, as an example of operating on Yaml files.
-  * [UpdateConcoursePipelineTest](./src/test/java/com/yourorg/UpdateConcoursePipelineTest.java) - A test class for the `UpdateConcoursePipeline` recipe.
+A straight type replacement with no conditional logic.
 
-## Local Publishing for Testing
+### 4. Add `@Transactional` to `@Service` classes
 
-Before you publish your recipe module to an artifact repository, you may want to try it out locally.
-To do this on the command line, using `gradle`, run:
+EJBs get Container-Managed Transactions (CMT) by default.
+This step adds `@Transactional` to every `@Service` class that doesn't already have it, replicating that behaviour in Spring.
+
+### 5. Remove EJB build dependencies
+
+Removes the following from the build descriptor:
+
+- `javax:javaee-api`
+- `javax.ejb:javax.ejb-api`
+- `org.jboss.spec.javax.ejb:jboss-ejb-api_3*`
+- `com.oracle.weblogic:javax.javaee-api`
+
+### 6. Add Spring Boot starters
+
+- `org.springframework.boot:spring-boot-starter:2.7.18` — added only if `javax.ejb.*` is in use.
+- `org.springframework.boot:spring-boot-starter-data-jpa:2.7.18` — added only if `javax.persistence.*` is in use.
+
+---
+
+### What is not handled automatically
+
+The following scenarios require manual migration and are either flagged with a comment or skipped entirely:
+
+- Distributed (`@Remote`) EJBs
+- JNDI lookups (`@EJB(lookup = ...)`)
+- Message-driven beans (MDBs)
+- EJB timers
+
+## Individual recipes
+
+| Recipe | Type | Description |
+|--------|------|-------------|
+| `hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateEjbAnnotations` | Imperative Java | Replaces `@EJB` injection with `@Autowired` / `@Qualifier` |
+| `hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateStatelessSessionBeans` | Imperative Java | Replaces `@Stateless`/`@Singleton` with `@Service`, removes EJB-specific annotations |
+| `hu.dojcsak.openrewrite.recipe.jee.ejb.AddTransactionalToServiceBeans` | Imperative Java | Adds `@Transactional` to `@Service` classes as a CMT replacement |
+| `hu.dojcsak.openrewrite.recipe.MigrateStatelessEjb` | Declarative YAML | Composite recipe that runs all of the above plus dependency management |
+
+## Local publishing for testing
+
+Build and install the recipe JAR to your local Maven repository:
 
 ```bash
 ./gradlew publishToMavenLocal
-# or ./gradlew pTML
-# or mvn install
 ```
 
-To publish using maven, run:
+This publishes to `~/.m2/repository` under the coordinates `hu.dojcsak.openrewrite.recipe:rewrite-jee-to-boot:1.0.0-SNAPSHOT`.
 
-```bash
-./mvnw install
-```
+### Apply with the Gradle rewrite plugin
 
-This will publish to your local maven repository, typically under `~/.m2/repository`.
+Add the following to the `build.gradle.kts` (or `build.gradle`) of the project you want to migrate:
 
-Replace the groupId, artifactId, recipe name, and version in the below snippets with the ones that correspond to your recipe.
-
-In the pom.xml of a different project you wish to test your recipe out in, make your recipe module a plugin dependency of rewrite-maven-plugin:
-
-```xml
-<project>
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.openrewrite.maven</groupId>
-                <artifactId>rewrite-maven-plugin</artifactId>
-                <version>RELEASE</version>
-                <configuration>
-                    <activeRecipes>
-                        <recipe>com.yourorg.NoGuavaListsNewArrayList</recipe>
-                    </activeRecipes>
-                </configuration>
-                <dependencies>
-                    <dependency>
-                        <groupId>com.yourorg</groupId>
-                        <artifactId>rewrite-recipe-starter</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-        </plugins>
-    </build>
-</project>
-```
-
-Unlike Maven, Gradle must be explicitly configured to resolve dependencies from Maven local.
-The root project of your Gradle build, make your recipe module a dependency of the `rewrite` configuration:
-
-```groovy
+```kotlin
 plugins {
-    id("java")
     id("org.openrewrite.rewrite") version("latest.release")
 }
 
@@ -104,53 +89,52 @@ repositories {
 }
 
 dependencies {
-    rewrite("com.yourorg:rewrite-recipe-starter:latest.integration")
+    rewrite("hu.dojcsak.openrewrite.recipe:rewrite-jee-to-boot:1.0.0-SNAPSHOT")
 }
 
 rewrite {
-    activeRecipe("com.yourorg.NoGuavaListsNewArrayList")
+    activeRecipe("hu.dojcsak.openrewrite.recipe.MigrateStatelessEjb")
 }
 ```
 
-Now you can run `mvn rewrite:run` or `gradlew rewriteRun` to run your recipe.
+Then run:
 
-## Publishing to Artifact Repositories
+```bash
+./gradlew rewriteRun
+```
 
-This project is configured to publish to Moderne's open artifact repository (via the `publishing` task at the bottom of
-the `build.gradle.kts` file). If you want to publish elsewhere, you'll want to update that task.
-[app.moderne.io](https://app.moderne.io) can draw recipes from the provided repository, as well as from [Maven Central](https://search.maven.org).
+### Apply with the Maven rewrite plugin
 
-Note:
-Running the publish task _will not_ update [app.moderne.io](https://app.moderne.io), as only Moderne employees can
-add new recipes. If you want to add your recipe to [app.moderne.io](https://app.moderne.io), please ask the
-team in [Slack](https://join.slack.com/t/rewriteoss/shared_invite/zt-nj42n3ea-b~62rIHzb3Vo0E1APKCXEA) or in [Discord](https://discord.gg/xk3ZKrhWAb).
+Add the following to the `pom.xml` of the project you want to migrate:
 
-These other docs might also be useful for you depending on where you want to publish the recipe:
+```xml
+<plugin>
+    <groupId>org.openrewrite.maven</groupId>
+    <artifactId>rewrite-maven-plugin</artifactId>
+    <version>RELEASE</version>
+    <configuration>
+        <activeRecipes>
+            <recipe>hu.dojcsak.openrewrite.recipe.MigrateStatelessEjb</recipe>
+        </activeRecipes>
+    </configuration>
+    <dependencies>
+        <dependency>
+            <groupId>hu.dojcsak.openrewrite.recipe</groupId>
+            <artifactId>rewrite-jee-to-boot</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
+</plugin>
+```
 
-* Sonatype's instructions for [publishing to Maven Central](https://maven.apache.org/repository/guide-central-repository-upload.html)
-* Gradle's instructions on the [Gradle Publishing Plugin](https://docs.gradle.org/current/userguide/publishing\_maven.html).
+Then run:
 
-### From Github Actions
-
-The `.github` directory contains a Github action that will push a snapshot on every successful build.
-
-Run the release action to publish a release version of a recipe.
-
-### From the command line
-
-To build a snapshot, run `./gradlew snapshot publish` to build a snapshot and publish it to Moderne's open artifact repository for inclusion at [app.moderne.io](https://app.moderne.io).
-
-To build a release, run `./gradlew final publish` to tag a release and publish it to Moderne's open artifact repository for inclusion at [app.moderne.io](https://app.moderne.io).
+```bash
+mvn rewrite:run
+```
 
 ## Applying OpenRewrite recipe development best practices
 
-We maintain a collection of [best practices for writing OpenRewrite recipes](https://docs.openrewrite.org/recipes/java/recipes).
-You can apply these recommendations to your recipes by running the following command:
-
 ```bash
 ./gradlew --init-script init.gradle rewriteRun -Drewrite.activeRecipe=org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPractices
-```
-or
-```bash
-./mvnw -U org.openrewrite.maven:rewrite-maven-plugin:run -Drewrite.recipeArtifactCoordinates=org.openrewrite.recipe:rewrite-rewrite:RELEASE -Drewrite.activeRecipes=org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPractices
 ```
