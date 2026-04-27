@@ -22,16 +22,10 @@ import java.util.Comparator;
 @EqualsAndHashCode(callSuper = false)
 public class AddTransactionalToServiceBeans extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Add @Transactional to @Service beans";
-    }
+    String displayName = "Add @Transactional to @Service beans";
 
-    @Override
-    public String getDescription() {
-        return "Adds @Transactional to Spring @Service classes that do not already have it, " +
-               "as a replacement for EJB Container-Managed Transactions (CMT).";
-    }
+    String description = "Adds @Transactional to Spring @Service classes that do not already have it, " +
+            "as a replacement for EJB Container-Managed Transactions (CMT).";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

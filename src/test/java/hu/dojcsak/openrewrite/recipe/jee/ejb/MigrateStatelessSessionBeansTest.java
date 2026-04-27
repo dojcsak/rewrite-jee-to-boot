@@ -1,6 +1,7 @@
 package hu.dojcsak.openrewrite.recipe.jee.ejb;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -16,24 +17,25 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                         .classpath("javax.ejb-api", "spring-context"));
     }
 
+    @DocumentExample
     @Test
     void replacesStatelessWithService() {
         rewriteRun(
                 java(
                         """
-                        import javax.ejb.Stateless;
-
-                        @Stateless
-                        class OrderService {
-                        }
-                        """,
+                                import javax.ejb.Stateless;
+                                
+                                @Stateless
+                                class OrderService {
+                                }
+                                """,
                         """
-                        import org.springframework.stereotype.Service;
-
-                        @Service
-                        class OrderService {
-                        }
-                        """
+                                import org.springframework.stereotype.Service;
+                                
+                                @Service
+                                class OrderService {
+                                }
+                                """
                 )
         );
     }
@@ -43,19 +45,19 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                        import javax.ejb.Stateless;
-
-                        @Stateless(name = "orderSvc")
-                        class OrderService {
-                        }
-                        """,
+                                import javax.ejb.Stateless;
+                                
+                                @Stateless(name = "orderSvc")
+                                class OrderService {
+                                }
+                                """,
                         """
-                        import org.springframework.stereotype.Service;
-
-                        @Service("orderSvc")
-                        class OrderService {
-                        }
-                        """
+                                import org.springframework.stereotype.Service;
+                                
+                                @Service("orderSvc")
+                                class OrderService {
+                                }
+                                """
                 )
         );
     }
@@ -65,21 +67,21 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                        import javax.ejb.Singleton;
-                        import javax.ejb.Startup;
-
-                        @Singleton
-                        @Startup
-                        class CacheService {
-                        }
-                        """,
+                                import javax.ejb.Singleton;
+                                import javax.ejb.Startup;
+                                
+                                @Singleton
+                                @Startup
+                                class CacheService {
+                                }
+                                """,
                         """
-                        import org.springframework.stereotype.Service;
-
-                        @Service
-                        class CacheService {
-                        }
-                        """
+                                import org.springframework.stereotype.Service;
+                                
+                                @Service
+                                class CacheService {
+                                }
+                                """
                 )
         );
     }
@@ -89,18 +91,18 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                        import javax.ejb.Local;
-
-                        @Local
-                        interface OrderServiceLocal {
-                            void placeOrder();
-                        }
-                        """,
+                                import javax.ejb.Local;
+                                
+                                @Local
+                                interface OrderServiceLocal {
+                                    void placeOrder();
+                                }
+                                """,
                         """
-                        interface OrderServiceLocal {
-                            void placeOrder();
-                        }
-                        """
+                                interface OrderServiceLocal {
+                                    void placeOrder();
+                                }
+                                """
                 )
         );
     }
@@ -110,21 +112,21 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                        import javax.ejb.LocalBean;
-                        import javax.ejb.Stateless;
-
-                        @Stateless
-                        @LocalBean
-                        class OrderService {
-                        }
-                        """,
+                                import javax.ejb.LocalBean;
+                                import javax.ejb.Stateless;
+                                
+                                @Stateless
+                                @LocalBean
+                                class OrderService {
+                                }
+                                """,
                         """
-                        import org.springframework.stereotype.Service;
-
-                        @Service
-                        class OrderService {
-                        }
-                        """
+                                import org.springframework.stereotype.Service;
+                                
+                                @Service
+                                class OrderService {
+                                }
+                                """
                 )
         );
     }
@@ -134,27 +136,27 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                        import javax.ejb.Remote;
-                        import javax.ejb.Stateless;
-
-                        interface OrderServiceRemote {}
-
-                        @Stateless
-                        @Remote(OrderServiceRemote.class)
-                        class OrderService implements OrderServiceRemote {
-                        }
-                        """,
+                                import javax.ejb.Remote;
+                                import javax.ejb.Stateless;
+                                
+                                interface OrderServiceRemote {}
+                                
+                                @Stateless
+                                @Remote(OrderServiceRemote.class)
+                                class OrderService implements OrderServiceRemote {
+                                }
+                                """,
                         """
-                        import javax.ejb.Remote;
-                        import javax.ejb.Stateless;
-
-                        interface OrderServiceRemote {}
-
-                        /*~~(Skipped: bean implements @Remote interface — manual migration to Spring required)~~>*/@Stateless
-                        @Remote(OrderServiceRemote.class)
-                        class OrderService implements OrderServiceRemote {
-                        }
-                        """
+                                import javax.ejb.Remote;
+                                import javax.ejb.Stateless;
+                                
+                                interface OrderServiceRemote {}
+                                
+                                /*~~(Skipped: bean implements @Remote interface — manual migration to Spring required)~~>*/@Stateless
+                                @Remote(OrderServiceRemote.class)
+                                class OrderService implements OrderServiceRemote {
+                                }
+                                """
                 )
         );
     }

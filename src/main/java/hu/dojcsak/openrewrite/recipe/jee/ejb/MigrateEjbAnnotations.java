@@ -5,6 +5,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
@@ -16,6 +17,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
+
 /**
  * Replaces {@code @EJB} injection (field and setter) with Spring {@code @Autowired}.
  * If the {@code @EJB} annotation carries a {@code beanName} attribute, a corresponding
@@ -26,17 +29,11 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class MigrateEjbAnnotations extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Replace @EJB injection with @Autowired";
-    }
+    String displayName = "Replace @EJB injection with @Autowired";
 
-    @Override
-    public String getDescription() {
-        return "Replaces @EJB field and setter injection with Spring @Autowired. " +
-               "Adds @Qualifier if the @EJB annotation has a beanName attribute. " +
-               "Lookup and beanInterface attributes are flagged with TODO comments.";
-    }
+    String description = "Replaces @EJB field and setter injection with Spring @Autowired. " +
+            "Adds @Qualifier if the @EJB annotation has a beanName attribute. " +
+            "Lookup and beanInterface attributes are flagged with TODO comments.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -82,7 +79,7 @@ public class MigrateEjbAnnotations extends Recipe {
                                 Comparator.comparing(J.Annotation::getSimpleName)));
                 maybeAddImport("org.springframework.beans.factory.annotation.Autowired", false);
 
-                if (beanName != null && !beanName.isEmpty()) {
+                if (StringUtils.isNotEmpty(beanName)) {
                     updateCursor(m);
                     m = JavaTemplate.builder("@Qualifier(\"" + beanName + "\")")
                             .imports("org.springframework.beans.factory.annotation.Qualifier")
@@ -133,7 +130,7 @@ public class MigrateEjbAnnotations extends Recipe {
                                 Comparator.comparing(J.Annotation::getSimpleName)));
                 maybeAddImport("org.springframework.beans.factory.annotation.Autowired", false);
 
-                if (beanName != null && !beanName.isEmpty()) {
+                if (StringUtils.isNotEmpty(beanName)) {
                     updateCursor(mv);
                     mv = JavaTemplate.builder("@Qualifier(\"" + beanName + "\")")
                             .imports("org.springframework.beans.factory.annotation.Qualifier")
@@ -169,7 +166,7 @@ public class MigrateEjbAnnotations extends Recipe {
                 }
                 J.Annotation first = annotations.get(0);
                 org.openrewrite.java.tree.Space space = first.getPrefix();
-                List<org.openrewrite.marker.Markers> noMarkers = java.util.Collections.emptyList();
+                List<org.openrewrite.marker.Markers> noMarkers = emptyList();
                 org.openrewrite.java.tree.Comment comment = new org.openrewrite.java.tree.TextComment(
                         false, " " + message + " ", "", org.openrewrite.marker.Markers.EMPTY);
                 List<org.openrewrite.java.tree.Comment> newComments = new ArrayList<>(space.getComments());

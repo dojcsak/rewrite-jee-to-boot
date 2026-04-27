@@ -1,6 +1,7 @@
 package hu.dojcsak.openrewrite.recipe.jee.ejb;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -16,27 +17,28 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
                         .classpath("javax.ejb-api", "spring-beans"));
     }
 
+    @DocumentExample
     @Test
     void replacesEjbFieldWithAutowired() {
         rewriteRun(
                 java("interface PaymentService {}"),
                 java(
                         """
-                        import javax.ejb.EJB;
-
-                        class OrderService {
-                            @EJB
-                            private PaymentService paymentService;
-                        }
-                        """,
+                                import javax.ejb.EJB;
+                                
+                                class OrderService {
+                                    @EJB
+                                    private PaymentService paymentService;
+                                }
+                                """,
                         """
-                        import org.springframework.beans.factory.annotation.Autowired;
-
-                        class OrderService {
-                            @Autowired
-                            private PaymentService paymentService;
-                        }
-                        """
+                                import org.springframework.beans.factory.annotation.Autowired;
+                                
+                                class OrderService {
+                                    @Autowired
+                                    private PaymentService paymentService;
+                                }
+                                """
                 )
         );
     }
@@ -47,23 +49,23 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
                 java("interface PaymentService {}"),
                 java(
                         """
-                        import javax.ejb.EJB;
-
-                        class OrderService {
-                            @EJB(beanName = "premiumPayment")
-                            private PaymentService paymentService;
-                        }
-                        """,
+                                import javax.ejb.EJB;
+                                
+                                class OrderService {
+                                    @EJB(beanName = "premiumPayment")
+                                    private PaymentService paymentService;
+                                }
+                                """,
                         """
-                        import org.springframework.beans.factory.annotation.Autowired;
-                        import org.springframework.beans.factory.annotation.Qualifier;
-
-                        class OrderService {
-                            @Autowired
-                            @Qualifier("premiumPayment")
-                            private PaymentService paymentService;
-                        }
-                        """
+                                import org.springframework.beans.factory.annotation.Autowired;
+                                import org.springframework.beans.factory.annotation.Qualifier;
+                                
+                                class OrderService {
+                                    @Autowired
+                                    @Qualifier("premiumPayment")
+                                    private PaymentService paymentService;
+                                }
+                                """
                 )
         );
     }
@@ -74,29 +76,29 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
                 java("interface PaymentService {}"),
                 java(
                         """
-                        import javax.ejb.EJB;
-
-                        class OrderService {
-                            private PaymentService paymentService;
-
-                            @EJB
-                            public void setPaymentService(PaymentService paymentService) {
-                                this.paymentService = paymentService;
-                            }
-                        }
-                        """,
+                                import javax.ejb.EJB;
+                                
+                                class OrderService {
+                                    private PaymentService paymentService;
+                                
+                                    @EJB
+                                    public void setPaymentService(PaymentService paymentService) {
+                                        this.paymentService = paymentService;
+                                    }
+                                }
+                                """,
                         """
-                        import org.springframework.beans.factory.annotation.Autowired;
-
-                        class OrderService {
-                            private PaymentService paymentService;
-
-                            @Autowired
-                            public void setPaymentService(PaymentService paymentService) {
-                                this.paymentService = paymentService;
-                            }
-                        }
-                        """
+                                import org.springframework.beans.factory.annotation.Autowired;
+                                
+                                class OrderService {
+                                    private PaymentService paymentService;
+                                
+                                    @Autowired
+                                    public void setPaymentService(PaymentService paymentService) {
+                                        this.paymentService = paymentService;
+                                    }
+                                }
+                                """
                 )
         );
     }
@@ -107,21 +109,21 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
                 java("interface PaymentService {}"),
                 java(
                         """
-                        import javax.ejb.EJB;
-
-                        class OrderService {
-                            @EJB(lookup = "app/PaymentService")
-                            private PaymentService paymentService;
-                        }
-                        """,
+                                import javax.ejb.EJB;
+                                
+                                class OrderService {
+                                    @EJB(lookup = "app/PaymentService")
+                                    private PaymentService paymentService;
+                                }
+                                """,
                         """
-                        import org.springframework.beans.factory.annotation.Autowired;
-
-                        class OrderService {
-                            // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated @Autowired
-                            private PaymentService paymentService;
-                        }
-                        """
+                                import org.springframework.beans.factory.annotation.Autowired;
+                                
+                                class OrderService {
+                                    // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated @Autowired
+                                    private PaymentService paymentService;
+                                }
+                                """
                 )
         );
     }
@@ -132,29 +134,29 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
                 java("interface PaymentService {}"),
                 java(
                         """
-                        import javax.ejb.EJB;
-
-                        class OrderService {
-                            private PaymentService paymentService;
-
-                            @EJB(lookup = "app/PaymentService")
-                            public void setPaymentService(PaymentService paymentService) {
-                                this.paymentService = paymentService;
-                            }
-                        }
-                        """,
+                                import javax.ejb.EJB;
+                                
+                                class OrderService {
+                                    private PaymentService paymentService;
+                                
+                                    @EJB(lookup = "app/PaymentService")
+                                    public void setPaymentService(PaymentService paymentService) {
+                                        this.paymentService = paymentService;
+                                    }
+                                }
+                                """,
                         """
-                        import org.springframework.beans.factory.annotation.Autowired;
-
-                        class OrderService {
-                            private PaymentService paymentService;
-
-                            // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated @Autowired
-                            public void setPaymentService(PaymentService paymentService) {
-                                this.paymentService = paymentService;
-                            }
-                        }
-                        """
+                                import org.springframework.beans.factory.annotation.Autowired;
+                                
+                                class OrderService {
+                                    private PaymentService paymentService;
+                                
+                                    // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated @Autowired
+                                    public void setPaymentService(PaymentService paymentService) {
+                                        this.paymentService = paymentService;
+                                    }
+                                }
+                                """
                 )
         );
     }
@@ -165,10 +167,10 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
                 java("interface PaymentService {}"),
                 java(
                         """
-                        class OrderService {
-                            private PaymentService paymentService;
-                        }
-                        """
+                                class OrderService {
+                                    private PaymentService paymentService;
+                                }
+                                """
                 )
         );
     }

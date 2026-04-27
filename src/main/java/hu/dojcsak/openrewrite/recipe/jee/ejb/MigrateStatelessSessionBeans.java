@@ -6,7 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
@@ -14,6 +14,7 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,18 +35,12 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class MigrateStatelessSessionBeans extends Recipe {
 
-    @Override
-    public String getDisplayName() {
-        return "Migrate @Stateless and @Singleton EJBs to @Service";
-    }
+    String displayName = "Migrate @Stateless and @Singleton EJBs to @Service";
 
-    @Override
-    public String getDescription() {
-        return "Replaces @Stateless and @Singleton EJB annotations with Spring @Service. " +
-               "Removes @Local, @LocalBean, and @Startup annotations. " +
-               "Removes @Local from business interfaces. " +
-               "Session beans implementing a @Remote interface are not migrated.";
-    }
+    String description = "Replaces @Stateless and @Singleton EJB annotations with Spring @Service. " +
+            "Removes @Local, @LocalBean, and @Startup annotations. " +
+            "Removes @Local from business interfaces. " +
+            "Session beans implementing a @Remote interface are not migrated.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -82,9 +77,9 @@ public class MigrateStatelessSessionBeans extends Recipe {
                             "Skipped: bean implements @Remote interface — manual migration to Spring required");
                 }
 
-                String name = hasStateless
-                        ? MigrateEjbAnnotations.getStringAttribute(ejbAnnotation(cd, statelessMatcher), "name")
-                        : MigrateEjbAnnotations.getStringAttribute(ejbAnnotation(cd, singletonMatcher), "name");
+                String name = hasStateless ?
+                        MigrateEjbAnnotations.getStringAttribute(ejbAnnotation(cd, statelessMatcher), "name") :
+                        MigrateEjbAnnotations.getStringAttribute(ejbAnnotation(cd, singletonMatcher), "name");
 
                 // Remove all EJB class-level annotations
                 List<J.Annotation> annotations = new ArrayList<>(cd.getLeadingAnnotations());
@@ -101,9 +96,9 @@ public class MigrateStatelessSessionBeans extends Recipe {
                 updateCursor(cd);
 
                 // Add @Service, preserving the name attribute when present
-                String template = (name != null && !name.isEmpty())
-                        ? "@Service(\"" + name + "\")"
-                        : "@Service";
+                String template = (StringUtils.isNotEmpty(name)) ?
+                        "@Service(\"" + name + "\")" :
+                        "@Service";
                 cd = JavaTemplate.builder(template)
                         .imports("org.springframework.stereotype.Service")
                         .javaParser(JavaParser.fromJavaVersion().classpath("spring-context"))
