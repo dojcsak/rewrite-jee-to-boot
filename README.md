@@ -39,10 +39,24 @@ Removes the following from the build descriptor:
 - `org.jboss.spec.javax.ejb:jboss-ejb-api_3*`
 - `com.oracle.weblogic:javax.javaee-api`
 
-### 6. Add Spring Boot starters
+### 6. Add Spring Boot core starter
 
-- `org.springframework.boot:spring-boot-starter:2.7.18` — added only if `javax.ejb.*` is in use.
-- `org.springframework.boot:spring-boot-starter-data-jpa:2.7.18` — added only if `javax.persistence.*` is in use.
+`org.springframework.boot:spring-boot-starter:2.7.18` — added only if `javax.ejb.*` is in use.
+
+### 7. Add `spring-tx` for non-JPA modules
+
+`org.springframework:spring-tx:5.3.39` — added only if `@Transactional` is in use **and** `javax.persistence.*` is **not** in use.
+
+EJB Container-Managed Transactions (CMT) do not imply JPA usage. A service bean that is transactional but has no persistence types (e.g. an email-sending service) needs `spring-tx` on the classpath, but adding the full `spring-boot-starter-data-jpa` stack would be excessive. Modules that do use JPA already get `spring-tx` transitively through step 8, so the two steps are mutually exclusive:
+
+| Module type | `spring-tx` added directly | via `spring-boot-starter-data-jpa` |
+|---|---|---|
+| Non-JPA (e.g. email, messaging) | yes (this step) | — |
+| JPA | — | yes (transitively, next step) |
+
+### 8. Add Spring Boot JPA starter
+
+`org.springframework.boot:spring-boot-starter-data-jpa:2.7.18` — added only if `javax.persistence.*` is in use.
 
 ---
 
@@ -62,6 +76,7 @@ The following scenarios require manual migration and are either flagged with a c
 | `hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateEjbAnnotations` | Imperative Java | Replaces `@EJB` injection with `@Autowired` / `@Qualifier` |
 | `hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateStatelessSessionBeans` | Imperative Java | Replaces `@Stateless`/`@Singleton` with `@Service`, removes EJB-specific annotations |
 | `hu.dojcsak.openrewrite.recipe.jee.ejb.AddTransactionalToServiceBeans` | Imperative Java | Adds `@Transactional` to `@Service` classes as a CMT replacement |
+| `hu.dojcsak.openrewrite.recipe.jee.ejb.AddSpringTxUnlessJpaPresent` | Imperative Java (`ScanningRecipe`) | Adds `spring-tx` dependency only when `@Transactional` is used without `javax.persistence.*` |
 | `hu.dojcsak.openrewrite.recipe.MigrateStatelessEjb` | Declarative YAML | Composite recipe that runs all of the above plus dependency management |
 
 ## Local publishing for testing
