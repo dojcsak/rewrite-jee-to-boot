@@ -29,6 +29,7 @@ dependencies {
     implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
 
     implementation("org.openrewrite:rewrite-java")
+    implementation("org.openrewrite:rewrite-maven")
     implementation("org.openrewrite.recipe:rewrite-java-dependencies")
     implementation("org.openrewrite:rewrite-yaml")
     implementation("org.openrewrite:rewrite-xml")
@@ -46,6 +47,7 @@ dependencies {
     // JEE types needed by the parser in tests
     testRuntimeOnly("javax.ejb:javax.ejb-api:3.2.2")
     testRuntimeOnly("javax.inject:javax.inject:1")
+    testRuntimeOnly("javax.persistence:javax.persistence-api:2.2")
 
     // Spring 5.3.x types needed by JavaTemplate at recipe runtime — targets Spring Boot 2.7.x
     // (runtimeOnly covers test runtime too)
