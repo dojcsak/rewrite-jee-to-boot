@@ -1,23 +1,26 @@
 plugins {
     id("org.openrewrite.build.recipe-library-base") version "latest.release"
 
-    // This uses the nexus publishing plugin to publish to the moderne-dev repository
-    // Remove it if you prefer to publish by other means, such as the maven-publish plugin
-    id("org.openrewrite.build.publish") version "latest.release"
-    id("nebula.release") version "latest.release"
-
     // Configures artifact repositories used for dependency resolution to include maven central and nexus snapshots.
     // If you are operating in an environment where public repositories are not accessible, we recommend using a
     // virtual repository which mirrors both maven central and nexus snapshots.
     id("org.openrewrite.build.recipe-repositories") version "latest.release"
+
+    id("maven-publish")
 }
 
-// Set as appropriate for your organization
-group = "com.yourorg"
-description = "Rewrite recipes."
+group = "hu.dojcsak.openrewrite.recipe"
+version = "1.0.0-SNAPSHOT"
+description = "JEE to Spring Boot rewrite recipes"
 
 recipeDependencies {
     parserClasspath("org.jspecify:jspecify:1.0.0")
+    parserClasspath("javax.ejb:javax.ejb-api:3.2.2")
+    parserClasspath("javax.inject:javax.inject:1")
+}
+
+dependencyLocking {
+    lockAllConfigurations()
 }
 
 dependencies {
@@ -26,64 +29,88 @@ dependencies {
     implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
 
     implementation("org.openrewrite:rewrite-java")
+    implementation("org.openrewrite:rewrite-maven")
     implementation("org.openrewrite.recipe:rewrite-java-dependencies")
     implementation("org.openrewrite:rewrite-yaml")
     implementation("org.openrewrite:rewrite-xml")
     implementation("org.openrewrite.meta:rewrite-analysis")
 
-    // Refaster style recipes need the rewrite-templating annotation processor and dependency for generated recipes
-    // https://github.com/openrewrite/rewrite-templating/releases
-    annotationProcessor("org.openrewrite:rewrite-templating:latest.release")
+    // Provides JavaTemplate.builder() used at runtime in imperative recipes.
+    // No Refaster templates (@BeforeTemplate/@AfterTemplate) in this project, so no annotationProcessor needed.
     implementation("org.openrewrite:rewrite-templating")
-    // The `@BeforeTemplate` and `@AfterTemplate` annotations are needed for refaster style recipes
-    compileOnly("com.google.errorprone:error_prone_core:latest.release") {
-        exclude("com.google.auto.service", "auto-service-annotations")
-        exclude("io.github.eisop","dataflow-errorprone")
-    }
 
     // The RewriteTest class needed for testing recipes
     testImplementation("org.openrewrite:rewrite-test") {
         exclude(group = "org.slf4j", module = "slf4j-nop")
     }
-    testImplementation("org.assertj:assertj-core:latest.release")
+
+    // JEE types needed by the parser in tests
+    testRuntimeOnly("javax.ejb:javax.ejb-api:3.2.2")
+    testRuntimeOnly("javax.inject:javax.inject:1")
+    testRuntimeOnly("javax.persistence:javax.persistence-api:2.2")
+
+    // Spring 5.3.x types needed by JavaTemplate at recipe runtime — targets Spring Boot 2.7.x
+    // (runtimeOnly covers test runtime too)
+    runtimeOnly("org.springframework:spring-beans:5.3.+")
+    runtimeOnly("org.springframework:spring-context:5.3.+")
+    runtimeOnly("org.springframework:spring-tx:5.3.+")
 
     // Support for parsing different Java versions
     testRuntimeOnly("org.openrewrite:rewrite-java-17")
     testRuntimeOnly("org.openrewrite:rewrite-java-21")
     testRuntimeOnly("org.openrewrite:rewrite-java-25")
 
-    // Need to have a slf4j binding to see any output enabled from the parser.
-    runtimeOnly("ch.qos.logback:logback-classic:1.5.+")
-
-    // Our recipe converts Guava's `Lists` type
-    testRuntimeOnly("com.google.guava:guava:latest.release")
-    testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
-    testRuntimeOnly("org.springframework:spring-core:latest.release")
-    testRuntimeOnly("org.springframework:spring-context:latest.release")
+    // SLF4J API needed at compile time for @Slf4j (Lombok); binding provided at runtime
+    compileOnly("org.slf4j:slf4j-api:latest.release")
+    runtimeOnly("ch.qos.logback:logback-classic:latest.release")
 }
 
-signing {
-    // To enable signing have your CI workflow set the "signingKey" and "signingPassword" Gradle project properties
-    isRequired = false
-}
-
-// Use maven-style "SNAPSHOT" versioning for non-release builds
-configure<nebula.plugin.release.git.base.ReleasePluginExtension> {
-    defaultVersionStrategy = nebula.plugin.release.NetflixOssStrategies.SNAPSHOT(project)
-}
-
-configure<PublishingExtension> {
+publishing {
     publications {
-        named("nebula", MavenPublication::class.java) {
-            suppressPomMetadataWarningsFor("runtimeElements")
+        create<MavenPublication>("maven") {
+            from(components["java"])
+            versionMapping {
+                usage("java-api") {
+                    fromResolutionOf("runtimeClasspath")
+                }
+                usage("java-runtime") {
+                    fromResolutionResult()
+                }
+            }
+        }
+    }
+    repositories {
+        // ./gradlew publishToMavenLocal
+        mavenLocal()
+        // ./gradlew publish -PnexusUrl=https://nexus.example.com/repository/snapshots
+        if (project.hasProperty("nexusUrl")) {
+            maven {
+                name = "nexus"
+                url = uri(project.property("nexusUrl") as String)
+                if (project.hasProperty("nexusUsername") && project.hasProperty("nexusPassword")) {
+                    credentials {
+                        username = project.property("nexusUsername") as String
+                        password = project.property("nexusPassword") as String
+                    }
+                }
+            }
         }
     }
 }
 
-tasks.register("licenseFormat") {
-    println("License format task not implemented for rewrite-recipe-starter")
+tasks.named<Delete>("clean") {
+    delete("src/main/resources/META-INF/rewrite/classpath")
+}
+
+tasks.named("processResources") {
+    dependsOn(tasks.named("downloadRecipeDependencies"))
 }
 
 tasks.withType<JavaCompile> {
-    options.compilerArgs.add("-Arewrite.javaParserClasspathFrom=resources")
+    options.encoding = "UTF-8"
+}
+
+tasks.named<JavaCompile>("compileJava") {
+    // Suppress "source/target value 8 is obsolete" from the recipe-library-base plugin's --release 8.
+    options.compilerArgs.add("-Xlint:-options")
 }
