@@ -39,9 +39,10 @@ import static java.util.Collections.newSetFromMap;
  * The accumulator is keyed by module root path so that in a multi-module Maven project, JPA usage
  * in one module does not suppress {@code spring-tx} addition in unrelated non-JPA modules.
  * <p>
- * The {@code <version>} tag is omitted when {@code spring-tx} is already covered by a BOM in the
- * module's dependency management (e.g. {@code spring-boot-dependencies}), keeping the pom
- * consistent with other BOM-managed dependencies in the same project.
+ * The {@code <version>} tag is always omitted: when {@code spring-tx} is covered by a BOM (e.g.
+ * {@code spring-boot-dependencies}) no version is needed; when no BOM is present the user must
+ * supply the correct version for their Spring Framework generation (5.x or 6.x) to avoid an
+ * inadvertent downgrade or upgrade.
  */
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -53,7 +54,8 @@ public class AddSpringTxUnlessJpaPresent extends ScanningRecipe<AddSpringTxUnles
             "EJB session beans but does not use javax.persistence.* types. " +
             "Avoids redundancy with spring-boot-starter-data-jpa, which already provides spring-tx transitively. " +
             "The decision is made per module so that JPA usage in one module does not suppress the dependency in unrelated non-JPA modules. " +
-            "The explicit version is omitted when spring-tx is already covered by a BOM in the module's dependency management.";
+            "The <version> tag is always omitted: BOM-managed projects need no explicit version, " +
+            "and non-BOM projects must supply the version appropriate for their Spring Framework generation.";
 
     public static class Acc {
         final Set<String> ejbModules = newSetFromMap(new ConcurrentHashMap<>());
@@ -122,12 +124,10 @@ public class AddSpringTxUnlessJpaPresent extends ScanningRecipe<AddSpringTxUnles
                                 "spring-tx".equals(pom.getValue(d.getArtifactId())))) {
                     return super.visitDocument(document, ctx);
                 }
-                boolean bomManaged = pom.getManagedDependency("org.springframework", "spring-tx", null, null) != null;
                 Xml.Tag depTag = Xml.Tag.build(
                         "\n<dependency>\n" +
                         "<groupId>org.springframework</groupId>\n" +
                         "<artifactId>spring-tx</artifactId>\n" +
-                        (bomManaged ? "" : "<version>5.3.39</version>\n") +
                         "</dependency>"
                 );
                 Xml.Document maven = super.visitDocument(document, ctx);
