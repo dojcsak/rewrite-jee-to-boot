@@ -11,15 +11,24 @@ It runs the following steps in order:
 
 Replaces `@EJB` on fields and setter methods with Spring `@Autowired`.
 
-- If `beanName` is set on `@EJB`, a corresponding `@Qualifier("name")` is added.
-- If `lookup` or `beanInterface` is set, the annotation cannot be automatically migrated — a `// TODO:` comment is added instead.
+- If `beanName` is a string literal, a corresponding `@Qualifier("name")` is added.
+- The following cases cannot be automatically migrated — a `// TODO:` comment is added instead and `@Autowired` is **not** emitted:
+  - `lookup` or `beanInterface` is set
+  - `name`, `mappedName`, or non-empty `description` is set
+  - `beanName`, `lookup`, or `mappedName` is a constant reference (non-literal)
+- Constructor-level `@EJB` annotations are not processed (EJB does not support constructor injection).
 
 ### 2. Replace session bean annotations with `@Service`
 
-- `@Stateless` and `@Singleton` → `@Service` (the `name` attribute is preserved as `@Service("name")`).
+- `@Stateless` and `@Singleton` → `@Service` (the `name` string-literal attribute is preserved as `@Service("name")`).
 - Removes `@Local`, `@LocalBean`, and `@Startup` from bean classes.
-- Removes `@Local` from business interfaces.
-- **Skips** beans annotated with `@Remote` or implementing a `@Remote` interface — marks them with a search result comment requesting manual migration.
+- Removes `@Local` and `@LocalBean` from business interfaces.
+- Flags the following with a search result comment for manual review:
+  - `mappedName` (vendor JNDI binding — no Spring equivalent)
+  - `description` (informational only — no Spring equivalent)
+  - `name` when it is a constant reference (non-literal)
+  - `@Startup` removal (Spring `@Service` is lazy by default; `@Lazy(false)` needed for eager init)
+- **Skips** beans annotated with `@Remote` or implementing a `@Remote` interface (directly, through a superclass, or via superinterface inheritance) — marks them with a search result comment requesting manual migration.
 
 ### 3. Replace `javax.inject.@Inject` with `@Autowired`
 
@@ -52,7 +61,7 @@ Removes the following from the build descriptor:
 
 `org.springframework:spring-tx` — added only if the module contains `@Stateless`/`@Singleton` EJB session beans **and** does not use `javax.persistence.*` types.
 
-The explicit version (`5.3.39`, matching Spring Boot 2.7.18) is included only when `spring-tx` is not already covered by a BOM in the module's dependency management (e.g. `spring-boot-dependencies`). When a BOM manages the version, the `<version>` tag is omitted to keep the pom consistent with other BOM-managed dependencies.
+The `<version>` tag is **always omitted**. BOM-managed projects (e.g. those importing `spring-boot-dependencies`) need no explicit version. Projects without a BOM will receive OpenRewrite's built-in "no version provided" marker on the generated dependency, prompting manual version selection appropriate for the target Spring Framework generation (5.x for Spring Boot 2.x, 6.x for Spring Boot 3.x).
 
 EJB Container-Managed Transactions (CMT) do not imply JPA usage. A service bean that is transactional but has no persistence types (e.g. an email-sending service) needs `spring-tx` on the classpath, but adding the full `spring-boot-starter-data-jpa` stack would be excessive. Modules that do use JPA already get `spring-tx` transitively through step 9, so the two steps are mutually exclusive.
 
@@ -73,9 +82,12 @@ The decision is made **per module**: in a multi-module Maven project, JPA usage 
 
 The following scenarios require manual migration and are either flagged with a comment or skipped entirely:
 
-- Distributed (`@Remote`) EJBs
-- JNDI lookups (`@EJB(lookup = ...)`)
-- Interface narrowing (`@EJB(beanInterface = ...)`)
+- Distributed (`@Remote`) EJBs — skipped with a search result comment
+- `@EJB(lookup = ...)` — JNDI lookup, flagged with a TODO comment
+- `@EJB(beanInterface = ...)` — interface narrowing, flagged with a TODO comment
+- `@EJB(name = ...)` / `@EJB(mappedName = ...)` / non-empty `@EJB(description = ...)` — flagged with a TODO comment
+- Non-literal `beanName`, `lookup`, or `mappedName` (constant reference) — flagged with a TODO comment
+- `@Stateless(mappedName = ...)` / `@Singleton(mappedName = ...)` — flagged with a search result comment
 - Message-driven beans (MDBs)
 - EJB timers
 

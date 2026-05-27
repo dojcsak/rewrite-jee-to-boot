@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
 @EqualsAndHashCode(callSuper = false)
 public class MigrateEjbAnnotations extends Recipe {
 
-    // Matches either a Java string literal (to preserve) or a block comment (to remove).
+    // Matches a Java string literal (to preserve), a block comment, or a line comment (to remove).
     // [\s\S]*? crosses newlines; the string-literal arm prevents stripping /* ... */ that
     // appears inside a quoted annotation attribute value.
     private static final Pattern BLOCK_COMMENT_OR_STRING =
@@ -89,15 +89,15 @@ public class MigrateEjbAnnotations extends Recipe {
                     return m;
                 }
 
-                String beanName    = getStringAttribute(ejb, "beanName");
-                String lookup      = getStringAttribute(ejb, "lookup");
-                String mappedName  = getStringAttribute(ejb, "mappedName");
+                String beanName = getStringAttribute(ejb, "beanName");
+                String lookup = getStringAttribute(ejb, "lookup");
+                String mappedName = getStringAttribute(ejb, "mappedName");
                 // beanInterface is Class-typed, never a J.Literal — use hasAttribute instead of getStringAttribute
                 boolean hasBeanInterface = hasAttribute(ejb, "beanInterface");
-                boolean hasNonLiteralBeanName  = beanName   == null && hasAttribute(ejb, "beanName");
+                boolean hasNonLiteralBeanName = beanName == null && hasAttribute(ejb, "beanName");
                 // lookup / mappedName: flag non-empty literal and non-literal (constant reference);
                 // empty string is the EJB default and is treated as absent.
-                boolean hasNonLiteralLookup    = lookup     == null && hasAttribute(ejb, "lookup");
+                boolean hasNonLiteralLookup = lookup == null && hasAttribute(ejb, "lookup");
                 boolean hasNonLiteralMappedName = mappedName == null && hasAttribute(ejb, "mappedName");
                 // name is a JNDI environment-namespace alias with no Spring equivalent.
                 // Flag only when non-empty literal or non-literal (constant reference);
@@ -115,9 +115,9 @@ public class MigrateEjbAnnotations extends Recipe {
                 maybeRemoveImport("javax.ejb.EJB");
                 updateCursor(m);
 
-                if (StringUtils.isNotEmpty(lookup) || hasBeanInterface || hasNonLiteralBeanName || hasEjbNameAttr
-                        || hasNonLiteralLookup || StringUtils.isNotEmpty(mappedName) || hasNonLiteralMappedName
-                        || hasEjbDescriptionAttr) {
+                if (StringUtils.isNotEmpty(lookup) || hasBeanInterface || hasNonLiteralBeanName || hasEjbNameAttr ||
+                        hasNonLiteralLookup || StringUtils.isNotEmpty(mappedName) || hasNonLiteralMappedName ||
+                        hasEjbDescriptionAttr) {
                     // Cannot auto-migrate — add TODO comment without @Autowired
                     return flagWithTodoComment(m,
                             "TODO: " + ejbAnnotationText + " could not be automatically migrated");
@@ -158,15 +158,15 @@ public class MigrateEjbAnnotations extends Recipe {
                     return mv;
                 }
 
-                String beanName    = getStringAttribute(ejb, "beanName");
-                String lookup      = getStringAttribute(ejb, "lookup");
-                String mappedName  = getStringAttribute(ejb, "mappedName");
+                String beanName = getStringAttribute(ejb, "beanName");
+                String lookup = getStringAttribute(ejb, "lookup");
+                String mappedName = getStringAttribute(ejb, "mappedName");
                 // beanInterface is Class-typed, never a J.Literal — use hasAttribute instead of getStringAttribute
                 boolean hasBeanInterface = hasAttribute(ejb, "beanInterface");
-                boolean hasNonLiteralBeanName   = beanName   == null && hasAttribute(ejb, "beanName");
+                boolean hasNonLiteralBeanName = beanName == null && hasAttribute(ejb, "beanName");
                 // lookup / mappedName: flag non-empty literal and non-literal (constant reference);
                 // empty string is the EJB default and is treated as absent.
-                boolean hasNonLiteralLookup     = lookup     == null && hasAttribute(ejb, "lookup");
+                boolean hasNonLiteralLookup = lookup == null && hasAttribute(ejb, "lookup");
                 boolean hasNonLiteralMappedName = mappedName == null && hasAttribute(ejb, "mappedName");
                 // name is a JNDI environment-namespace alias with no Spring equivalent.
                 // Flag only when non-empty literal or non-literal (constant reference);
@@ -184,9 +184,9 @@ public class MigrateEjbAnnotations extends Recipe {
                 maybeRemoveImport("javax.ejb.EJB");
                 updateCursor(mv);
 
-                if (StringUtils.isNotEmpty(lookup) || hasBeanInterface || hasNonLiteralBeanName || hasEjbNameAttr
-                        || hasNonLiteralLookup || StringUtils.isNotEmpty(mappedName) || hasNonLiteralMappedName
-                        || hasEjbDescriptionAttr) {
+                if (StringUtils.isNotEmpty(lookup) || hasBeanInterface || hasNonLiteralBeanName || hasEjbNameAttr ||
+                        hasNonLiteralLookup || StringUtils.isNotEmpty(mappedName) || hasNonLiteralMappedName ||
+                        hasEjbDescriptionAttr) {
                     // Cannot auto-migrate — add TODO comment without @Autowired
                     return flagWithTodoComment(mv,
                             "TODO: " + ejbAnnotationText + " could not be automatically migrated");
@@ -286,10 +286,10 @@ public class MigrateEjbAnnotations extends Recipe {
                 return m;
             }
 
-            // Strips block comments and normalises whitespace/parens in the annotation's printed
-            // text for use in a TODO message. String literals are replaced with index tokens
-            // bracketed by SOH+STX (chars 1 and 2) before block comments are removed and
-            // whitespace normalised globally, then restored afterwards. The 5-char sequence
+            // Strips block and line comments and normalises whitespace/parens in the annotation's
+            // printed text for use in a TODO message. String literals are replaced with index tokens
+            // bracketed by SOH+STX (chars 1 and 2) before comments are removed and whitespace
+            // normalised globally, then restored afterwards. The 5-char sequence
             // SOH STX <digit(s)> STX SOH is collision-free in practice: even if a raw SOH byte
             // appears in a string literal's source, it cannot form the full 5-char bracket without
             // an adjacent STX. The single global normalisation step collapses whitespace across

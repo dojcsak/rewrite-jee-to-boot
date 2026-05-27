@@ -126,9 +126,9 @@ public class AddSpringTxUnlessJpaPresent extends ScanningRecipe<AddSpringTxUnles
                 }
                 Xml.Tag depTag = Xml.Tag.build(
                         "\n<dependency>\n" +
-                        "<groupId>org.springframework</groupId>\n" +
-                        "<artifactId>spring-tx</artifactId>\n" +
-                        "</dependency>"
+                                "<groupId>org.springframework</groupId>\n" +
+                                "<artifactId>spring-tx</artifactId>\n" +
+                                "</dependency>"
                 );
                 Xml.Document maven = super.visitDocument(document, ctx);
                 Xml.Tag root = maven.getRoot();
