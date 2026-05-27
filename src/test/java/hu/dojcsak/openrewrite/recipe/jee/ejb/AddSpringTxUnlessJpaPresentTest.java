@@ -50,10 +50,9 @@ class AddSpringTxUnlessJpaPresentTest implements RewriteTest {
                                     <artifactId>example</artifactId>
                                     <version>1.0</version>
                                     <dependencies>
-                                        <dependency>
+                                        <!--~~(No version provided for direct dependency org.springframework:spring-tx:compile)~~>--><dependency>
                                             <groupId>org.springframework</groupId>
                                             <artifactId>spring-tx</artifactId>
-                                            <version>5.3.39</version>
                                         </dependency>
                                     </dependencies>
                                 </project>
@@ -84,10 +83,9 @@ class AddSpringTxUnlessJpaPresentTest implements RewriteTest {
                                     <artifactId>example</artifactId>
                                     <version>1.0</version>
                                     <dependencies>
-                                        <dependency>
+                                        <!--~~(No version provided for direct dependency org.springframework:spring-tx:compile)~~>--><dependency>
                                             <groupId>org.springframework</groupId>
                                             <artifactId>spring-tx</artifactId>
-                                            <version>5.3.39</version>
                                         </dependency>
                                     </dependencies>
                                 </project>
@@ -131,7 +129,7 @@ class AddSpringTxUnlessJpaPresentTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void omitsVersionWhenSpringTxIsManagedByBom() {
+    void omitsVersionTag() {
         rewriteRun(
                 java(
                         """
@@ -229,10 +227,9 @@ class AddSpringTxUnlessJpaPresentTest implements RewriteTest {
                                     <artifactId>example</artifactId>
                                     <version>1.0</version>
                                     <dependencies>
-                                        <dependency>
+                                        <!--~~(No version provided for direct dependency org.springframework:spring-tx:compile)~~>--><dependency>
                                             <groupId>org.springframework</groupId>
                                             <artifactId>spring-tx</artifactId>
-                                            <version>5.3.39</version>
                                         </dependency>
                                     </dependencies>
                                 </project>
