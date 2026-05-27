@@ -3,24 +3,32 @@ name: hu.dojcsak.openrewrite.recipe.MigrateStatelessEjb
 displayName: Migrate stateless EJB to Spring Boot
 description: >-
   Migrates stateless EJB components to Spring Boot 2.7.x services.
-  Replaces @EJB field/setter injection with @Autowired (adding @Qualifier when beanName is present;
-  lookup and beanInterface attributes cannot be auto-migrated and are flagged with a TODO comment),
-  replaces @Stateless/@Singleton with @Service, removes EJB-specific annotations
-  (@Local, @LocalBean, @Startup), replaces javax.inject.@Inject with @Autowired,
-  adds @Transactional to @Service classes as a replacement for Container-Managed Transactions (CMT),
-  removes <packaging>ejb</packaging> from module POMs and <type>ejb</type> from dependency references,
-  removes EJB build dependencies (javaee-api, javax.ejb-api, jboss-ejb-api, weblogic javaee-api),
-  adds spring-boot-starter for all EJB modules, spring-tx for non-JPA modules,
-  and spring-boot-starter-data-jpa for modules that use javax.persistence.*.
+  Replaces @EJB field/setter injection with @Autowired, adding @Qualifier when beanName is a string
+  literal; flags lookup, beanInterface, name, mappedName, non-empty description, and non-literal
+  beanName/lookup/mappedName with a TODO comment instead of migrating automatically; skips
+  constructor-level @EJB (EJB does not support constructor injection).
+  Replaces @Stateless/@Singleton with @Service (preserving the name string-literal attribute);
+  removes @Local, @LocalBean, and @Startup from bean classes and interfaces; flags mappedName,
+  description, non-literal name, and @Startup removal with a search result comment; skips beans
+  that implement a @Remote interface (directly, through a superclass, or via superinterface
+  inheritance) and marks them for manual migration.
+  Replaces javax.inject.@Inject with @Autowired.
+  Adds @Transactional to @Service classes as a replacement for Container-Managed Transactions (CMT).
+  Removes <packaging>ejb</packaging> from module POMs and <type>ejb</type> from dependency references.
+  Removes EJB build dependencies (javaee-api, javax.ejb-api, jboss-ejb-api, weblogic javaee-api).
+  Adds spring-boot-starter for all EJB modules, spring-tx (without an explicit version) for non-JPA
+  modules, and spring-boot-starter-data-jpa for modules that use javax.persistence.*.
 tags:
   - jee
   - ejb
   - spring-boot
 recipeList:
-  # 1. Replace @EJB field/setter injection with @Autowired (+@Qualifier if beanName present)
+  # 1. Replace @EJB field/setter injection with @Autowired (+@Qualifier if beanName is a string literal;
+  #    non-migratable attributes flagged with TODO; constructor @EJB skipped)
   - hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateEjbAnnotations
 
-  # 2. Replace @Stateless/@Singleton with @Service, remove @Local/@LocalBean/@Startup
+  # 2. Replace @Stateless/@Singleton with @Service; remove @Local/@LocalBean/@Startup from classes and
+  #    interfaces; flag mappedName/description/@Startup/non-literal name; skip @Remote beans
   - hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateStatelessSessionBeans
 
   # 3. Replace javax.inject.@Inject with @Autowired

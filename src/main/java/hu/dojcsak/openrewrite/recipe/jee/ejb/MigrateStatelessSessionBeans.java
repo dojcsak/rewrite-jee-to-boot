@@ -40,26 +40,26 @@ public class MigrateStatelessSessionBeans extends Recipe {
 
     String description = "Replaces @Stateless and @Singleton EJB annotations with Spring @Service. " +
             "Removes @Local, @LocalBean, and @Startup annotations. " +
-            "Removes @Local from business interfaces. " +
+            "Removes @Local and @LocalBean from business interfaces. " +
             "Flags mappedName and description attributes with a search marker for manual review. " +
             "Session beans implementing a @Remote interface are not migrated.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            private final AnnotationMatcher statelessMatcher  = new AnnotationMatcher("@javax.ejb.Stateless");
-            private final AnnotationMatcher singletonMatcher  = new AnnotationMatcher("@javax.ejb.Singleton");
-            private final AnnotationMatcher localMatcher      = new AnnotationMatcher("@javax.ejb.Local");
-            private final AnnotationMatcher localBeanMatcher  = new AnnotationMatcher("@javax.ejb.LocalBean");
-            private final AnnotationMatcher startupMatcher    = new AnnotationMatcher("@javax.ejb.Startup");
-            private final AnnotationMatcher remoteMatcher     = new AnnotationMatcher("@javax.ejb.Remote");
+            private final AnnotationMatcher statelessMatcher = new AnnotationMatcher("@javax.ejb.Stateless");
+            private final AnnotationMatcher singletonMatcher = new AnnotationMatcher("@javax.ejb.Singleton");
+            private final AnnotationMatcher localMatcher = new AnnotationMatcher("@javax.ejb.Local");
+            private final AnnotationMatcher localBeanMatcher = new AnnotationMatcher("@javax.ejb.LocalBean");
+            private final AnnotationMatcher startupMatcher = new AnnotationMatcher("@javax.ejb.Startup");
+            private final AnnotationMatcher remoteMatcher = new AnnotationMatcher("@javax.ejb.Remote");
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(
                     J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
 
-                // Remove @Local from business interfaces
+                // Remove @Local and @LocalBean from business interfaces
                 if (cd.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
                     return removeLocalFromInterface(cd);
                 }
@@ -100,8 +100,8 @@ public class MigrateStatelessSessionBeans extends Recipe {
                 List<J.Annotation> annotations = new ArrayList<>(cd.getLeadingAnnotations());
                 annotations.removeIf(a ->
                         statelessMatcher.matches(a) || singletonMatcher.matches(a) ||
-                        localMatcher.matches(a) || localBeanMatcher.matches(a) ||
-                        startupMatcher.matches(a));
+                                localMatcher.matches(a) || localBeanMatcher.matches(a) ||
+                                startupMatcher.matches(a));
                 cd = cd.withLeadingAnnotations(annotations);
                 maybeRemoveImport("javax.ejb.Stateless");
                 maybeRemoveImport("javax.ejb.Singleton");
