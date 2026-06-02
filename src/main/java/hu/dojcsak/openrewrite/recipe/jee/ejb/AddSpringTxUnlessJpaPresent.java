@@ -13,9 +13,12 @@ import org.openrewrite.maven.MavenTagInsertionComparator;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -106,6 +109,7 @@ public class AddSpringTxUnlessJpaPresent extends ScanningRecipe<AddSpringTxUnles
 
     private static final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
 
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Acc acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
@@ -124,27 +128,48 @@ public class AddSpringTxUnlessJpaPresent extends ScanningRecipe<AddSpringTxUnles
                                 "spring-tx".equals(pom.getValue(d.getArtifactId())))) {
                     return super.visitDocument(document, ctx);
                 }
-                Xml.Tag depTag = Xml.Tag.build(
-                        "\n<dependency>\n" +
-                                "<groupId>org.springframework</groupId>\n" +
-                                "<artifactId>spring-tx</artifactId>\n" +
-                                "</dependency>"
-                );
+                // AST-based fallback: when no version is provided and no BOM is present,
+                // maybeUpdateModel() cannot resolve the dep → the cached model stays stale →
+                // getRequestedDependencies() misses spring-tx in cycle 2. Reading from the AST
+                // directly is always reliable.
+                if (document.getRoot().getChild("dependencies").isPresent()) {
+                    List<? extends Content> deps = document.getRoot().getChild("dependencies").get().getContent();
+                    if (deps != null && deps.stream()
+                            .filter(c -> c instanceof Xml.Tag && "dependency".equals(((Xml.Tag) c).getName()))
+                            .map(c -> (Xml.Tag) c)
+                            .anyMatch(dep ->
+                                    "org.springframework".equals(dep.getChildValue("groupId").orElse("")) &&
+                                    "spring-tx".equals(dep.getChildValue("artifactId").orElse("")))) {
+                        return super.visitDocument(document, ctx);
+                    }
+                }
                 Xml.Document maven = super.visitDocument(document, ctx);
                 Xml.Tag root = maven.getRoot();
                 if (!root.getChild("dependencies").isPresent()) {
                     doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<dependencies/>"),
                             new MavenTagInsertionComparator(root.getContent() == null ? emptyList() : root.getContent())));
                 }
-                // Append at end of <dependencies>: no comparator passed to AddToTagVisitor
                 doAfterVisit(new MavenIsoVisitor<ExecutionContext>() {
                     @Override
                     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                        // super first: children are visited on the unmodified tag
+                        Xml.Tag t = super.visitTag(tag, ctx);
                         if (DEPENDENCIES_MATCHER.matches(getCursor())) {
-                            doAfterVisit(new AddToTagVisitor<>(tag, depTag));
+                            String depPrefix = AppendDependency.siblingDepPrefix(t);
+                            String childPrefix = AppendDependency.siblingChildPrefix(t, depPrefix);
+                            Xml.Tag newDep = Xml.Tag.build(
+                                    "<dependency>" +
+                                    childPrefix + "<groupId>org.springframework</groupId>" +
+                                    childPrefix + "<artifactId>spring-tx</artifactId>" +
+                                    depPrefix + "</dependency>"
+                            ).withPrefix(depPrefix);
+                            List<Content> content = new ArrayList<>(
+                                    t.getContent() == null ? emptyList() : t.getContent());
+                            content.add(newDep);
+                            t = t.withContent(content);
                             maybeUpdateModel();
                         }
-                        return super.visitTag(tag, ctx);
+                        return t;
                     }
                 });
                 return maven;
