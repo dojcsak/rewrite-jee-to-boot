@@ -57,7 +57,7 @@ recipeList:
       artifactId: javax.javaee-api
 
   # 7. Add Spring Boot 2.7.x core starter (only if javax.ejb.* is used)
-  - org.openrewrite.java.dependencies.AddDependency:
+  - hu.dojcsak.openrewrite.recipe.jee.ejb.AppendDependency:
       groupId: org.springframework.boot
       artifactId: spring-boot-starter
       version: 2.7.18
@@ -68,7 +68,7 @@ recipeList:
   - hu.dojcsak.openrewrite.recipe.jee.ejb.AddSpringTxUnlessJpaPresent
 
   # 9. Add Spring Boot JPA starter (only when javax.persistence.* types are used)
-  - org.openrewrite.java.dependencies.AddDependency:
+  - hu.dojcsak.openrewrite.recipe.jee.ejb.AppendDependency:
       groupId: org.springframework.boot
       artifactId: spring-boot-starter-data-jpa
       version: 2.7.18
