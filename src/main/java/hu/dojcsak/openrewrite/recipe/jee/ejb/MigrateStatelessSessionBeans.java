@@ -13,6 +13,7 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
@@ -151,9 +152,17 @@ public class MigrateStatelessSessionBeans extends Recipe {
                 if (!hasLocal && !hasLocalBean) {
                     return cd;
                 }
+                // In CRLF files the first annotation's prefix is "" (the \r\n before it lives in the
+                // class declaration prefix). After removing all annotations the class prefix's trailing
+                // \r\n and the first modifier's \r\n combine into a blank line. Detect this up front.
+                boolean firstAnnotationHasNoNewline = !cd.getLeadingAnnotations().isEmpty() &&
+                        !cd.getLeadingAnnotations().get(0).getPrefix().getWhitespace().contains("\n");
                 List<J.Annotation> annotations = new ArrayList<>(cd.getLeadingAnnotations());
                 annotations.removeIf(a -> localMatcher.matches(a) || localBeanMatcher.matches(a));
                 cd = cd.withLeadingAnnotations(annotations);
+                if (annotations.isEmpty() && firstAnnotationHasNoNewline) {
+                    cd = stripOneLeadingNewlineFromFirstToken(cd);
+                }
                 if (hasLocal) {
                     maybeRemoveImport("javax.ejb.Local");
                 }
@@ -217,5 +226,23 @@ public class MigrateStatelessSessionBeans extends Recipe {
                         .orElse(null);
             }
         };
+    }
+
+    private static J.ClassDeclaration stripOneLeadingNewlineFromFirstToken(J.ClassDeclaration cd) {
+        if (!cd.getModifiers().isEmpty()) {
+            J.Modifier first = cd.getModifiers().get(0);
+            List<J.Modifier> mods = new ArrayList<>(cd.getModifiers());
+            mods.set(0, first.withPrefix(stripOneLeadingNewline(first.getPrefix())));
+            return cd.withModifiers(mods);
+        }
+        J.ClassDeclaration.Kind kind = cd.getPadding().getKind();
+        return cd.getPadding().withKind(kind.withPrefix(stripOneLeadingNewline(kind.getPrefix())));
+    }
+
+    private static Space stripOneLeadingNewline(Space space) {
+        String ws = space.getWhitespace();
+        if (ws.startsWith("\r\n")) return space.withWhitespace(ws.substring(2));
+        if (ws.startsWith("\n")) return space.withWhitespace(ws.substring(1));
+        return space;
     }
 }

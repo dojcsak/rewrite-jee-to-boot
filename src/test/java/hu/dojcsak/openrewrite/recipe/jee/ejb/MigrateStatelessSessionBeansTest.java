@@ -206,7 +206,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
           java(
                   """
                           import javax.ejb.Local;
-                          
+
                           @Local
                           interface OrderServiceLocal {
                               void placeOrder();
@@ -219,6 +219,90 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           """
           )
         );
+    }
+
+    @Test
+    void removesLocalAnnotationFromInterfaceWithJavadoc() {
+        // Removing @Local must not leave a blank line between the Javadoc and the interface keyword.
+        rewriteRun(
+          java(
+                  """
+                          import javax.ejb.Local;
+
+                          /**
+                           * Local interface for the session bean.
+                           */
+                          @Local
+                          public interface OrderServiceLocal {
+                              void placeOrder();
+                          }
+                          """,
+                  """
+                          /**
+                           * Local interface for the session bean.
+                           */
+                          public interface OrderServiceLocal {
+                              void placeOrder();
+                          }
+                          """
+          )
+        );
+    }
+
+    @Test
+    void removesLocalAnnotationFromInterfaceWithJavadocCrlf() {
+        // Same as above but with CRLF line endings (Windows files) — regression test for a bug
+        // where @Local removal left a blank line between the Javadoc closing "*/" and the interface keyword.
+        String NL = "\r\n";
+        String input =
+                "import javax.ejb.Local;" + NL +
+                NL +
+                "/**" + NL +
+                " * Local interface for the session bean." + NL +
+                " */" + NL +
+                "@Local" + NL +
+                "public interface OrderServiceLocal {" + NL +
+                "    void placeOrder();" + NL +
+                "}" + NL;
+        String expected =
+                "/**" + NL +
+                " * Local interface for the session bean." + NL +
+                " */" + NL +
+                "public interface OrderServiceLocal {" + NL +
+                "    void placeOrder();" + NL +
+                "}" + NL;
+        rewriteRun(java(input, expected));
+    }
+
+    @Test
+    void removesLocalAnnotationCrlfWithPackageAndLineComments() {
+        // Regression test: CRLF files with a package declaration and line comments at the top
+        // left a spurious blank line between the Javadoc "*/" and the interface keyword after @Local removal.
+        String NL = "\r\n";
+        String input =
+                "// license-header" + NL +
+                "//" + NL +
+                "package com.example;" + NL +
+                NL +
+                "import javax.ejb.Local;" + NL +
+                NL +
+                "/**" + NL +
+                " * Local interface." + NL +
+                " */" + NL +
+                "@Local" + NL +
+                "public interface OrderServiceLocal {" + NL +
+                "}" + NL;
+        String expected =
+                "// license-header" + NL +
+                "//" + NL +
+                "package com.example;" + NL +
+                NL +
+                "/**" + NL +
+                " * Local interface." + NL +
+                " */" + NL +
+                "public interface OrderServiceLocal {" + NL +
+                "}" + NL;
+        rewriteRun(java(input, expected));
     }
 
     @Test
