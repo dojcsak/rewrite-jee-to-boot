@@ -49,7 +49,7 @@ public class AddTransactionalToServiceBeans extends Recipe {
 
                 cd = JavaTemplate.builder("@Transactional")
                         .imports("org.springframework.transaction.annotation.Transactional")
-                        .javaParser(JavaParser.fromJavaVersion().classpath("spring-tx"))
+                        .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-tx"))
                         .build()
                         .apply(getCursor(), cd.getCoordinates().addAnnotation(
                                 Comparator.comparing(J.Annotation::getSimpleName)));
