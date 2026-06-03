@@ -17,6 +17,11 @@ recipeDependencies {
     parserClasspath("org.jspecify:jspecify:1.0.1")
     parserClasspath("javax.ejb:javax.ejb-api:3.2.2")
     parserClasspath("javax.inject:javax.inject:1")
+    // Spring types needed by JavaTemplate at recipe runtime — embedded in META-INF/rewrite/classpath/
+    // so JavaParser.dependenciesFromClasspath() finds them regardless of Maven plugin version.
+    parserClasspath("org.springframework:spring-beans:5.3.39")
+    parserClasspath("org.springframework:spring-context:5.3.39")
+    parserClasspath("org.springframework:spring-tx:5.3.39")
 }
 
 dependencyLocking {
@@ -49,11 +54,11 @@ dependencies {
     testRuntimeOnly("javax.inject:javax.inject:1")
     testRuntimeOnly("javax.persistence:javax.persistence-api:2.2")
 
-    // Spring 5.3.x types needed by JavaTemplate at recipe runtime — targets Spring Boot 2.7.x
-    // (runtimeOnly covers test runtime too)
-    runtimeOnly("org.springframework:spring-beans:5.3.+")
-    runtimeOnly("org.springframework:spring-context:5.3.+")
-    runtimeOnly("org.springframework:spring-tx:5.3.+")
+    // Spring 5.3.x types needed by JavaTemplate classpath() lookup in tests
+    // (parserClasspath in recipeDependencies covers production runtime via META-INF/rewrite/classpath/)
+    testRuntimeOnly("org.springframework:spring-beans:5.3.39")
+    testRuntimeOnly("org.springframework:spring-context:5.3.39")
+    testRuntimeOnly("org.springframework:spring-tx:5.3.39")
 
     // Support for parsing different Java versions
     testRuntimeOnly("org.openrewrite:rewrite-java-17")

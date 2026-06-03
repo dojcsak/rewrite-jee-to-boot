@@ -68,7 +68,7 @@ public class MigrateEjbAnnotations extends Recipe {
                         parentCursor.getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
                     return mv;
                 }
-                return migrateEjbAnnotation(mv);
+                return migrateEjbAnnotation(mv, ctx);
             }
 
             @Override
@@ -125,7 +125,7 @@ public class MigrateEjbAnnotations extends Recipe {
 
                 m = JavaTemplate.builder("@Autowired")
                         .imports("org.springframework.beans.factory.annotation.Autowired")
-                        .javaParser(JavaParser.fromJavaVersion().classpath("spring-beans"))
+                        .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-beans"))
                         .build()
                         .apply(getCursor(), m.getCoordinates().addAnnotation(
                                 Comparator.comparing(J.Annotation::getSimpleName)));
@@ -139,7 +139,7 @@ public class MigrateEjbAnnotations extends Recipe {
                     }
                     m = JavaTemplate.builder("@Qualifier(" + beanNameSource + ")")
                             .imports("org.springframework.beans.factory.annotation.Qualifier")
-                            .javaParser(JavaParser.fromJavaVersion().classpath("spring-beans"))
+                            .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-beans"))
                             .build()
                             .apply(getCursor(), m.getCoordinates().addAnnotation(
                                     Comparator.comparing(J.Annotation::getSimpleName)));
@@ -149,7 +149,7 @@ public class MigrateEjbAnnotations extends Recipe {
                 return m;
             }
 
-            private J.VariableDeclarations migrateEjbAnnotation(J.VariableDeclarations mv) {
+            private J.VariableDeclarations migrateEjbAnnotation(J.VariableDeclarations mv, ExecutionContext ctx) {
                 J.Annotation ejb = mv.getLeadingAnnotations().stream()
                         .filter(ejbMatcher::matches)
                         .findFirst()
@@ -194,7 +194,7 @@ public class MigrateEjbAnnotations extends Recipe {
 
                 mv = JavaTemplate.builder("@Autowired")
                         .imports("org.springframework.beans.factory.annotation.Autowired")
-                        .javaParser(JavaParser.fromJavaVersion().classpath("spring-beans"))
+                        .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-beans"))
                         .build()
                         .apply(getCursor(), mv.getCoordinates().addAnnotation(
                                 Comparator.comparing(J.Annotation::getSimpleName)));
@@ -208,7 +208,7 @@ public class MigrateEjbAnnotations extends Recipe {
                     }
                     mv = JavaTemplate.builder("@Qualifier(" + beanNameSource + ")")
                             .imports("org.springframework.beans.factory.annotation.Qualifier")
-                            .javaParser(JavaParser.fromJavaVersion().classpath("spring-beans"))
+                            .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-beans"))
                             .build()
                             .apply(getCursor(), mv.getCoordinates().addAnnotation(
                                     Comparator.comparing(J.Annotation::getSimpleName)));

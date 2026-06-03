@@ -118,7 +118,7 @@ public class MigrateStatelessSessionBeans extends Recipe {
                         "@Service";
                 cd = JavaTemplate.builder(template)
                         .imports("org.springframework.stereotype.Service")
-                        .javaParser(JavaParser.fromJavaVersion().classpath("spring-context"))
+                        .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-context"))
                         .build()
                         .apply(getCursor(), cd.getCoordinates().addAnnotation(
                                 Comparator.comparing(J.Annotation::getSimpleName)));
