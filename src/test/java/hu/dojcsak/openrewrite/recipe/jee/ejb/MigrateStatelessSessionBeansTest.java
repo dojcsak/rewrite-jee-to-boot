@@ -77,8 +77,9 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           """,
                   """
                           import org.springframework.stereotype.Service;
-                          
-                          /*~~(@Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required)~~>*/@Service
+
+                          // TODO: @Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
+                          @Service
                           class CacheService {
                           }
                           """
@@ -93,7 +94,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import javax.ejb.Startup;
                           import javax.ejb.Stateless;
-                          
+
                           @Stateless
                           @Startup
                           class OrderService {
@@ -101,8 +102,9 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           """,
                   """
                           import org.springframework.stereotype.Service;
-                          
-                          /*~~(@Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required)~~>*/@Service
+
+                          // TODO: @Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
+                          @Service
                           class OrderService {
                           }
                           """
@@ -147,8 +149,9 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           """,
                   """
                           import org.springframework.stereotype.Service;
-                          
-                          /*~~(@Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required)~~>*/@Service("cacheService")
+
+                          // TODO: @Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
+                          @Service("cacheService")
                           class CacheService {
                           }
                           """
@@ -386,8 +389,9 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           """,
                   """
                           import org.springframework.stereotype.Service;
-                          
-                          /*~~(mappedName attribute could not be automatically migrated — configure the JNDI binding in Spring manually)~~>*/@Service
+
+                          // TODO: mappedName = "java:global/app/OrderService" could not be automatically migrated — configure the JNDI binding in Spring manually
+                          @Service
                           class OrderService {
                           }
                           """
@@ -408,8 +412,9 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           """,
                   """
                           import org.springframework.stereotype.Service;
-                          
-                          /*~~(mappedName attribute could not be automatically migrated — configure the JNDI binding in Spring manually)~~>*/@Service
+
+                          // TODO: mappedName = "java:global/app/CacheService" could not be automatically migrated — configure the JNDI binding in Spring manually
+                          @Service
                           class CacheService {
                           }
                           """
@@ -454,8 +459,9 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           """,
                   """
                           import org.springframework.stereotype.Service;
-                          
-                          /*~~(mappedName attribute could not be automatically migrated — configure the JNDI binding in Spring manually; @Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required)~~>*/@Service
+
+                          // TODO: mappedName = "java:global/app/CacheService" could not be automatically migrated — configure the JNDI binding in Spring manually; @Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
+                          @Service
                           class CacheService {
                           }
                           """
@@ -477,8 +483,9 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           """,
                   """
                           import org.springframework.stereotype.Service;
-                          
-                          /*~~(name attribute could not be automatically migrated — set the @Service bean name manually)~~>*/@Service
+
+                          // TODO: name attribute could not be automatically migrated — set the @Service bean name manually
+                          @Service
                           class OrderService {
                           }
                           """
@@ -698,8 +705,9 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           """,
                   """
                           import org.springframework.stereotype.Service;
-                          
-                          /*~~(description attribute has no Spring equivalent — consider preserving it as a code comment)~~>*/@Service
+
+                          // TODO: description attribute has no Spring equivalent — consider preserving it as a code comment
+                          @Service
                           class OrderService {
                           }
                           """

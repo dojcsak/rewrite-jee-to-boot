@@ -11,10 +11,13 @@ import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
@@ -27,7 +30,7 @@ import java.util.List;
  *   <li>{@code @Stateless} → {@code @Service} (preserving {@code name} as {@code @Service("name")})</li>
  *   <li>{@code @Singleton} → {@code @Service} (removing {@code @Startup})</li>
  *   <li>Removes {@code @Local} and {@code @LocalBean} from bean classes and interfaces</li>
- *   <li>Flags {@code mappedName} and {@code description} with a search marker for manual review</li>
+ *   <li>Flags {@code mappedName} and {@code description} with TODO comments for manual review</li>
  *   <li>Skips beans that implement a {@code @Remote} interface (directly or through supertype),
  *       or that are directly annotated with {@code @Remote}</li>
  * </ul>
@@ -42,7 +45,7 @@ public class MigrateStatelessSessionBeans extends Recipe {
     String description = "Replaces @Stateless and @Singleton EJB annotations with Spring @Service. " +
             "Removes @Local, @LocalBean, and @Startup annotations. " +
             "Removes @Local and @LocalBean from business interfaces. " +
-            "Flags mappedName and description attributes with a search marker for manual review. " +
+            "Flags mappedName and description attributes with TODO comments for manual review. " +
             "Session beans implementing a @Remote interface are not migrated.";
 
     @Override
@@ -124,14 +127,14 @@ public class MigrateStatelessSessionBeans extends Recipe {
                                 Comparator.comparing(J.Annotation::getSimpleName)));
                 maybeAddImport("org.springframework.stereotype.Service", false);
 
-                // SearchResult.found() uses computeByType((s1,s2)->s1): only the first marker survives
-                // on a given node. Collect all messages and emit a single SearchResult.
                 List<String> warnings = new ArrayList<>();
                 if (hasNonLiteralName) {
                     warnings.add("name attribute could not be automatically migrated — set the @Service bean name manually");
                 }
                 if (hasMappedName) {
-                    warnings.add("mappedName attribute could not be automatically migrated — configure the JNDI binding in Spring manually");
+                    String mappedNameSrc = MigrateEjbAnnotations.getStringAttributeSource(ejbAnnotation, "mappedName");
+                    String mappedNameLabel = mappedNameSrc != null ? "mappedName = " + mappedNameSrc : "mappedName";
+                    warnings.add(mappedNameLabel + " could not be automatically migrated — configure the JNDI binding in Spring manually");
                 }
                 if (hasDescription) {
                     warnings.add("description attribute has no Spring equivalent — consider preserving it as a code comment");
@@ -140,7 +143,7 @@ public class MigrateStatelessSessionBeans extends Recipe {
                     warnings.add("@Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required");
                 }
                 if (!warnings.isEmpty()) {
-                    cd = SearchResult.found(cd, String.join("; ", warnings));
+                    cd = flagWithTodoComment(cd, "TODO: " + String.join("; ", warnings));
                 }
 
                 return cd;
@@ -226,6 +229,52 @@ public class MigrateStatelessSessionBeans extends Recipe {
                         .orElse(null);
             }
         };
+    }
+
+    // Adds a TODO line comment before the class declaration.
+    //
+    // The comment must NOT be placed in cd.getPrefix(): import management (AddImport/RemoveImport)
+    // manipulates cd.prefix when rearranging the imports section and would move the comment to an
+    // unexpected position (e.g. before the import statements). Instead the comment is attached to
+    // the prefix of the first token that import management never touches:
+    //   1. First leading annotation (e.g. @Service added by this recipe)
+    //   2. First modifier (e.g. public) — fallback when no annotations are present
+    //   3. The class/interface/enum keyword — last resort
+    //
+    // The comment suffix is \n (or \r\n for CRLF files) so the following token stays on the next
+    // line. The blank line that was in cd.prefix separates the TODO from the preceding import.
+    private static J.ClassDeclaration flagWithTodoComment(J.ClassDeclaration cd, String message) {
+        String cdWs = cd.getPrefix().getWhitespace();
+        String newline = cdWs.contains("\r\n") ? "\r\n" : "\n";
+
+        List<J.Annotation> annotations = cd.getLeadingAnnotations();
+        if (!annotations.isEmpty()) {
+            J.Annotation first = annotations.get(0);
+            Space prefix = first.getPrefix();
+            Comment comment = new TextComment(false, " " + message, newline, Markers.EMPTY);
+            List<Comment> comments = new ArrayList<>(prefix.getComments());
+            comments.add(comment);
+            List<J.Annotation> newAnnotations = new ArrayList<>(annotations);
+            newAnnotations.set(0, first.withPrefix(prefix.withComments(comments)));
+            return cd.withLeadingAnnotations(newAnnotations);
+        }
+        List<J.Modifier> modifiers = cd.getModifiers();
+        if (!modifiers.isEmpty()) {
+            J.Modifier first = modifiers.get(0);
+            Space prefix = first.getPrefix();
+            Comment comment = new TextComment(false, " " + message, prefix.getWhitespace(), Markers.EMPTY);
+            List<Comment> comments = new ArrayList<>(prefix.getComments());
+            comments.add(comment);
+            List<J.Modifier> newModifiers = new ArrayList<>(modifiers);
+            newModifiers.set(0, first.withPrefix(prefix.withComments(comments).withWhitespace("")));
+            return cd.withModifiers(newModifiers);
+        }
+        J.ClassDeclaration.Kind kind = cd.getPadding().getKind();
+        Space kindPrefix = kind.getPrefix();
+        Comment comment = new TextComment(false, " " + message, newline, Markers.EMPTY);
+        List<Comment> comments = new ArrayList<>(kindPrefix.getComments());
+        comments.add(comment);
+        return cd.getPadding().withKind(kind.withPrefix(kindPrefix.withComments(comments)));
     }
 
     private static J.ClassDeclaration stripOneLeadingNewlineFromFirstToken(J.ClassDeclaration cd) {
