@@ -119,6 +119,54 @@ The following scenarios require manual migration and are either flagged with a c
 - Message-driven beans (MDBs)
 - EJB timers
 
+## Recipe: `hu.dojcsak.openrewrite.recipe.MigrateLog4j1ToSpringBootLogging`
+
+A composite recipe that migrates a Log4j 1.x based project to Spring Boot's default logging
+stack (SLF4J + Logback). It runs the following steps in order:
+
+### 1. Migrate Log4j 1.x API usage to SLF4J
+
+Runs `org.openrewrite.java.logging.slf4j.Log4j1ToSlf4j1`, which replaces Log4j 1.x API calls
+(`Logger`, `MDC`, `Appender`, ...) with their SLF4J equivalents. Internally this chains
+Log4j1→Log4j2 (adds `log4j-api` + `log4j-core` to the POM as an intermediate step) followed by
+Log4j2→SLF4J (migrates the Java code but does **not** remove the Log4j 2 POM dependencies).
+
+### 2. Rename loggers for their enclosing class
+
+Runs `org.openrewrite.java.logging.slf4j.LoggersNamedForEnclosingClass` to ensure every SLF4J
+logger is named after its actual enclosing class.
+
+### 3. Fix leftover `Throwable`-as-message calls
+
+Runs the custom `hu.dojcsak.openrewrite.recipe.logging.FixSlf4jLoggerObjectThrowable` recipe.
+Log4j 1.x accepted `Object` as the message argument and had no single-arg `Throwable` overload
+restriction, while SLF4J requires a `String` message. Rewrites `logger.level(throwable)` to
+`logger.level(throwable.getMessage())` and `logger.level(throwable, throwable)` to
+`logger.level(throwable.getMessage(), throwable)` for all standard log levels (error, warn,
+info, debug, trace).
+
+### 4. Remove Log4j and bridge dependencies
+
+Removes the following from `<dependencies>`:
+
+- `log4j:log4j` (kept as a safety net — already handled by step 1 in most cases)
+- `org.apache.logging.log4j:log4j-api`, `log4j-core`, `log4j-slf4j-impl` (added as an
+  intermediate step by Log4j1→Log4j2, not cleaned up by Log4j2→SLF4J)
+- `org.slf4j:log4j-over-slf4j` (the bridge shim, no longer needed once the real SLF4J API is used)
+
+### 5. Remove Log4j and bridge dependencies from dependency management
+
+Removes the same coordinates as step 4 from `<dependencyManagement>`, since `RemoveDependency`
+only touches `<dependencies>`.
+
+---
+
+Spring Boot's `spring-boot-starter` transitively provides `slf4j-api` and `logback-classic` via
+`spring-boot-starter-logging`, so no replacement dependency needs to be added.
+
+**Note:** `log4j.properties` / `log4j.xml` configuration files are not migrated automatically —
+convert them to `logback-spring.xml` or `application.properties` entries by hand.
+
 ## Individual recipes
 
 | Recipe | Type | Description |
@@ -130,6 +178,8 @@ The following scenarios require manual migration and are either flagged with a c
 | `hu.dojcsak.openrewrite.recipe.jee.ejb.RemoveEjbMavenPackaging` | Imperative Java | Removes `<packaging>ejb</packaging>` from module POMs and `<type>ejb</type>` from dependency references |
 | `hu.dojcsak.openrewrite.recipe.jee.ejb.AddSpringTxUnlessJpaPresent` | Imperative Java (`ScanningRecipe`) | Adds `spring-tx` dependency per module when `@Stateless`/`@Singleton` is present but `javax.persistence.*` is not |
 | `hu.dojcsak.openrewrite.recipe.MigrateStatelessEjb` | Declarative YAML | Composite recipe that runs all of the above plus dependency management |
+| `hu.dojcsak.openrewrite.recipe.logging.FixSlf4jLoggerObjectThrowable` | Imperative Java | Rewrites leftover `logger.level(throwable)` / `logger.level(throwable, throwable)` calls to use `throwable.getMessage()` |
+| `hu.dojcsak.openrewrite.recipe.MigrateLog4j1ToSpringBootLogging` | Declarative YAML | Composite recipe that migrates Log4j 1.x usage and dependencies to SLF4J + Logback |
 
 ## Local publishing for testing
 

@@ -28,6 +28,7 @@ recipeDependencies {
     parserClasspath("org.springframework.boot:spring-boot:2.7.+")
     parserClasspath("org.springframework.boot:spring-boot-test:2.7.+")
     parserClasspath("org.junit.jupiter:junit-jupiter-api:5.+")
+    parserClasspath("log4j:log4j:1.2.17")
 }
 
 dependencyLocking {
@@ -42,6 +43,7 @@ dependencies {
     implementation("org.openrewrite:rewrite-java")
     implementation("org.openrewrite:rewrite-maven")
     implementation("org.openrewrite.recipe:rewrite-java-dependencies")
+    implementation("org.openrewrite.recipe:rewrite-logging-frameworks")
     implementation("org.openrewrite:rewrite-yaml")
     implementation("org.openrewrite:rewrite-xml")
     implementation("org.openrewrite:rewrite-properties")
@@ -68,6 +70,7 @@ dependencies {
     testRuntimeOnly("org.springframework:spring-beans:5.3.39")
     testRuntimeOnly("org.springframework:spring-context:5.3.39")
     testRuntimeOnly("org.springframework:spring-tx:5.3.39")
+    testRuntimeOnly("log4j:log4j:1.2.17")
 
     // @SpringBootApplication type needed by classpath() lookup in AddJpaStarterDependencies tests
     testRuntimeOnly("org.springframework.boot:spring-boot-autoconfigure:2.7.18")

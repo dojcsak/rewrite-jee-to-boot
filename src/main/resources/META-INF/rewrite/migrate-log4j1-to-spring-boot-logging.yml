@@ -1,0 +1,73 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: hu.dojcsak.openrewrite.recipe.MigrateLog4j1ToSpringBootLogging
+displayName: Migrate Log4j 1.x to Spring Boot logging (SLF4J + Logback)
+description: >-
+  Migrates a Log4j 1.x based project to Spring Boot's default logging stack (SLF4J + Logback).
+  Replaces Log4j 1.x API calls with their SLF4J equivalents, corrects any logger declarations
+  that reference the wrong enclosing class, fixes leftover logger.level(throwable) /
+  logger.level(throwable, throwable) calls left over from partial migrations (SLF4J requires a
+  String message, unlike Log4j 1.x's Object-typed message parameter), and removes explicit log4j
+  dependencies from Maven POMs. Spring Boot's spring-boot-starter transitively provides
+  slf4j-api and logback-classic via spring-boot-starter-logging, so no replacement dependency
+  needs to be added.
+  Note: log4j.properties / log4j.xml configuration files are not migrated automatically —
+  convert them to logback-spring.xml or application.properties entries by hand.
+tags:
+  - logging
+  - log4j
+  - slf4j
+  - spring-boot
+recipeList:
+  # 1. Migrate Log4j 1.x API usage (Logger, MDC, Appender, …) to SLF4J 1.x.
+  #    Internally this chains Log4j1→Log4j2 (adds log4j-api + log4j-core to the POM)
+  #    followed by Log4j2→SLF4J (migrates Java code but does NOT remove Log4j 2 POM deps).
+  - org.openrewrite.java.logging.slf4j.Log4j1ToSlf4j1
+
+  # 2. Ensure every SLF4J logger is named for its actual enclosing class
+  - org.openrewrite.java.logging.slf4j.LoggersNamedForEnclosingClass
+
+  # 3. Fix logger.level(throwable) and logger.level(throwable, throwable) calls left over from
+  #    partial Log4j 1.x migrations. Log4j 1.x accepted Object as the message argument and had no
+  #    single-arg Throwable overload restriction; SLF4J requires String as the message.
+  #    Rewrites to logger.level(throwable.getMessage()) / logger.level(throwable.getMessage(), throwable).
+  - hu.dojcsak.openrewrite.recipe.logging.FixSlf4jLoggerObjectThrowable
+
+  # 4. Remove Log4j 1.x dependency — already handled by Log4j1→Log4j2 above, kept as safety net
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: log4j
+      artifactId: log4j
+
+  # 5. Remove Log4j 2.x dependencies added as intermediate step by Log4j1→Log4j2.
+  #    Log4j2→SLF4J does NOT clean these up from the POM, so we must do it explicitly.
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.apache.logging.log4j
+      artifactId: log4j-api
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.apache.logging.log4j
+      artifactId: log4j-core
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.apache.logging.log4j
+      artifactId: log4j-slf4j-impl
+
+  # 6. Remove the log4j-over-slf4j bridge shim — no longer needed once real SLF4J API is used
+  - org.openrewrite.java.dependencies.RemoveDependency:
+      groupId: org.slf4j
+      artifactId: log4j-over-slf4j
+
+  # 7. Remove all log4j entries from <dependencyManagement> (RemoveDependency only touches
+  #    <dependencies>, not the managed section)
+  - org.openrewrite.maven.RemoveManagedDependency:
+      groupId: log4j
+      artifactId: log4j
+  - org.openrewrite.maven.RemoveManagedDependency:
+      groupId: org.apache.logging.log4j
+      artifactId: log4j-api
+  - org.openrewrite.maven.RemoveManagedDependency:
+      groupId: org.apache.logging.log4j
+      artifactId: log4j-core
+  - org.openrewrite.maven.RemoveManagedDependency:
+      groupId: org.apache.logging.log4j
+      artifactId: log4j-slf4j-impl
+  - org.openrewrite.maven.RemoveManagedDependency:
+      groupId: org.slf4j
+      artifactId: log4j-over-slf4j
