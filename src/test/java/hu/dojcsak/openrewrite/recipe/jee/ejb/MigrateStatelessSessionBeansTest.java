@@ -78,7 +78,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import org.springframework.stereotype.Service;
 
-                          // TODO: @Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
+                          // TODO: @Startup removed - Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
                           @Service
                           class CacheService {
                           }
@@ -103,7 +103,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import org.springframework.stereotype.Service;
 
-                          // TODO: @Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
+                          // TODO: @Startup removed - Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
                           @Service
                           class OrderService {
                           }
@@ -150,7 +150,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import org.springframework.stereotype.Service;
 
-                          // TODO: @Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
+                          // TODO: @Startup removed - Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
                           @Service("cacheService")
                           class CacheService {
                           }
@@ -254,7 +254,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
 
     @Test
     void removesLocalAnnotationFromInterfaceWithJavadocCrlf() {
-        // Same as above but with CRLF line endings (Windows files) — regression test for a bug
+        // Same as above but with CRLF line endings (Windows files) - regression test for a bug
         // where @Local removal left a blank line between the Javadoc closing "*/" and the interface keyword.
         String NL = "\r\n";
         String input =
@@ -390,7 +390,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import org.springframework.stereotype.Service;
 
-                          // TODO: mappedName = "java:global/app/OrderService" could not be automatically migrated — configure the JNDI binding in Spring manually
+                          // TODO: mappedName = "java:global/app/OrderService" could not be automatically migrated - configure the JNDI binding in Spring manually
                           @Service
                           class OrderService {
                           }
@@ -413,7 +413,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import org.springframework.stereotype.Service;
 
-                          // TODO: mappedName = "java:global/app/CacheService" could not be automatically migrated — configure the JNDI binding in Spring manually
+                          // TODO: mappedName = "java:global/app/CacheService" could not be automatically migrated - configure the JNDI binding in Spring manually
                           @Service
                           class CacheService {
                           }
@@ -460,7 +460,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import org.springframework.stereotype.Service;
 
-                          // TODO: mappedName = "java:global/app/CacheService" could not be automatically migrated — configure the JNDI binding in Spring manually; @Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
+                          // TODO: mappedName = "java:global/app/CacheService" could not be automatically migrated - configure the JNDI binding in Spring manually; @Startup removed - Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required
                           @Service
                           class CacheService {
                           }
@@ -484,7 +484,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import org.springframework.stereotype.Service;
 
-                          // TODO: name attribute could not be automatically migrated — set the @Service bean name manually
+                          // TODO: name attribute could not be automatically migrated - set the @Service bean name manually
                           @Service
                           class OrderService {
                           }
@@ -576,7 +576,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import javax.ejb.Stateless;
                           
-                          /*~~(Skipped: bean implements @Remote interface — manual migration to Spring required)~~>*/@Stateless
+                          /*~~(Skipped: bean implements @Remote interface - manual migration to Spring required)~~>*/@Stateless
                           class OrderService implements OrderServiceLocal, OrderServiceRemote {
                           }
                           """
@@ -608,7 +608,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import javax.ejb.Stateless;
                           
-                          /*~~(Skipped: bean implements @Remote interface — manual migration to Spring required)~~>*/@Stateless
+                          /*~~(Skipped: bean implements @Remote interface - manual migration to Spring required)~~>*/@Stateless
                           class OrderService implements OrderServiceRemote {
                           }
                           """
@@ -646,7 +646,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import javax.ejb.Stateless;
                           
-                          /*~~(Skipped: bean implements @Remote interface — manual migration to Spring required)~~>*/@Stateless
+                          /*~~(Skipped: bean implements @Remote interface - manual migration to Spring required)~~>*/@Stateless
                           class OrderService extends AbstractOrderService {
                           }
                           """
@@ -684,7 +684,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import javax.ejb.Stateless;
                           
-                          /*~~(Skipped: bean implements @Remote interface — manual migration to Spring required)~~>*/@Stateless
+                          /*~~(Skipped: bean implements @Remote interface - manual migration to Spring required)~~>*/@Stateless
                           class OrderService implements OrderServiceRemote {
                           }
                           """
@@ -706,7 +706,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                   """
                           import org.springframework.stereotype.Service;
 
-                          // TODO: description attribute has no Spring equivalent — consider preserving it as a code comment
+                          // TODO: description attribute has no Spring equivalent - consider preserving it as a code comment
                           @Service
                           class OrderService {
                           }
@@ -758,7 +758,7 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
                           
                           interface OrderServiceRemote {}
                           
-                          /*~~(Skipped: bean implements @Remote interface — manual migration to Spring required)~~>*/@Stateless
+                          /*~~(Skipped: bean implements @Remote interface - manual migration to Spring required)~~>*/@Stateless
                           @Remote(OrderServiceRemote.class)
                           class OrderService implements OrderServiceRemote {
                           }
