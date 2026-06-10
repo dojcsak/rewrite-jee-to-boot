@@ -80,7 +80,7 @@ public class MigrateStatelessSessionBeans extends Recipe {
                     log.warn("Skipped @Remote EJB bean '{}' in {}: manual migration to Spring required",
                             cd.getSimpleName(), cu.getSourcePath());
                     return SearchResult.found(cd,
-                            "Skipped: bean implements @Remote interface — manual migration to Spring required");
+                            "Skipped: bean implements @Remote interface - manual migration to Spring required");
                 }
 
                 J.Annotation ejbAnnotation = hasStateless ?
@@ -129,20 +129,23 @@ public class MigrateStatelessSessionBeans extends Recipe {
 
                 List<String> warnings = new ArrayList<>();
                 if (hasNonLiteralName) {
-                    warnings.add("name attribute could not be automatically migrated — set the @Service bean name manually");
+                    warnings.add("name attribute could not be automatically migrated - set the @Service bean name manually");
                 }
                 if (hasMappedName) {
                     String mappedNameSrc = MigrateEjbAnnotations.getStringAttributeSource(ejbAnnotation, "mappedName");
                     String mappedNameLabel = mappedNameSrc != null ? "mappedName = " + mappedNameSrc : "mappedName";
-                    warnings.add(mappedNameLabel + " could not be automatically migrated — configure the JNDI binding in Spring manually");
+                    warnings.add(mappedNameLabel + " could not be automatically migrated - configure the JNDI binding in Spring manually");
                 }
                 if (hasDescription) {
-                    warnings.add("description attribute has no Spring equivalent — consider preserving it as a code comment");
+                    warnings.add("description attribute has no Spring equivalent - consider preserving it as a code comment");
                 }
                 if (hasStartup) {
-                    warnings.add("@Startup removed — Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required");
+                    warnings.add("@Startup removed - Spring @Service is lazy by default; add @Lazy(false) if eager initialization is required");
                 }
                 if (!warnings.isEmpty()) {
+                    J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+                    log.warn("Manual follow-up required in '{}' ({}): {}",
+                            cd.getSimpleName(), cu.getSourcePath(), String.join("; ", warnings));
                     cd = flagWithTodoComment(cd, "TODO: " + String.join("; ", warnings));
                 }
 
