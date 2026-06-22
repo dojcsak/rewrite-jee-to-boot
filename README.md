@@ -167,6 +167,48 @@ Spring Boot's `spring-boot-starter` transitively provides `slf4j-api` and `logba
 **Note:** `log4j.properties` / `log4j.xml` configuration files are not migrated automatically —
 convert them to `logback-spring.xml` or `application.properties` entries by hand.
 
+## Recipe: `hu.dojcsak.openrewrite.recipe.ConvertPropertiesToYaml`
+
+Converts `application*.properties` (e.g. `application.properties`, `application-dev.properties`)
+into the equivalent nested `application*.yaml`, which is the idiomatic configuration format for
+Spring Boot projects.
+
+### How it works
+
+1. Scans the project for every `application*.properties` file and for any `.yml`/`.yaml` files
+   that already exist alongside them.
+2. Builds a nested YAML mapping from each file's dotted property keys (e.g.
+   `spring.datasource.url` and `spring.datasource.username` are merged under a shared
+   `spring.datasource` mapping), preserving the original key order. Comment lines directly
+   preceding a property are carried over as YAML comments above the corresponding key.
+3. Writes the generated `application*.yaml` file and deletes the original `.properties` file.
+
+```properties
+# Datasource URL
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.username=sa
+```
+
+becomes:
+
+```yaml
+spring:
+  datasource:
+    # Datasource URL
+    url: jdbc:h2:mem:testdb
+    username: sa
+```
+
+### What is not handled automatically
+
+- A comment block at the **end of a file** with no property following it is dropped, since there
+  is nothing to attach it to.
+- **Key conflicts**, such as `a=1` together with `a.b=2`, are resolved last-one-wins with no
+  validation; these are rare and require manual review regardless of representation.
+- If a `.yml`/`.yaml` file with the target name **already exists**, the conversion for that file
+  is skipped entirely and the `.properties` file is left untouched, to avoid clobbering
+  hand-written YAML.
+
 ## Individual recipes
 
 | Recipe | Type | Description |
@@ -180,6 +222,8 @@ convert them to `logback-spring.xml` or `application.properties` entries by hand
 | `hu.dojcsak.openrewrite.recipe.MigrateStatelessEjb` | Declarative YAML | Composite recipe that runs all of the above plus dependency management |
 | `hu.dojcsak.openrewrite.recipe.logging.FixSlf4jLoggerObjectThrowable` | Imperative Java | Rewrites leftover `logger.level(throwable)` / `logger.level(throwable, throwable)` calls to use `throwable.getMessage()` |
 | `hu.dojcsak.openrewrite.recipe.MigrateLog4j1ToSpringBootLogging` | Declarative YAML | Composite recipe that migrates Log4j 1.x usage and dependencies to SLF4J + Logback |
+| `hu.dojcsak.openrewrite.recipe.boot.MigrateApplicationPropertiesToYaml` | Imperative Java (`ScanningRecipe`) | Converts `application*.properties` to nested `application*.yaml`, deleting the original file |
+| `hu.dojcsak.openrewrite.recipe.ConvertPropertiesToYaml` | Declarative YAML | Wraps `MigrateApplicationPropertiesToYaml` as a discoverable, top-level recipe |
 
 ## Local publishing for testing
 

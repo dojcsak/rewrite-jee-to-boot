@@ -1,10 +1,14 @@
 plugins {
-    id("org.openrewrite.build.recipe-library-base") version "latest.release"
+    // Pinned to 2.23.1 instead of "latest.release": 2.23.4's own POM declares a hard
+    // dependency on org.openrewrite:rewrite-java/rewrite-core/rewrite-maven:8.91.4, a version
+    // that was never published to Maven Central or the Gradle Plugin Portal (upstream release
+    // defect). Revert to "latest.release" once a fixed plugin version is published.
+    id("org.openrewrite.build.recipe-library-base") version "2.23.1"
 
     // Configures artifact repositories used for dependency resolution to include maven central and nexus snapshots.
     // If you are operating in an environment where public repositories are not accessible, we recommend using a
     // virtual repository which mirrors both maven central and nexus snapshots.
-    id("org.openrewrite.build.recipe-repositories") version "latest.release"
+    id("org.openrewrite.build.recipe-repositories") version "2.23.1"
 
     id("maven-publish")
 }

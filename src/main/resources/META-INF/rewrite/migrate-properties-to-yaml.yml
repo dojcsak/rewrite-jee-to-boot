@@ -1,0 +1,15 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: hu.dojcsak.openrewrite.recipe.ConvertPropertiesToYaml
+displayName: Convert Spring application.properties to application.yaml
+description: >-
+  Converts application*.properties (e.g. application.properties, application-dev.properties)
+  into the equivalent nested application*.yaml, preserving key order, and deletes the original
+  .properties file. Comment lines preceding a property are carried over as YAML comments above
+  the corresponding key. Skips any .properties file whose target .yml/.yaml already exists, to
+  avoid clobbering hand-written YAML.
+tags:
+  - spring-boot
+  - properties
+  - yaml
+recipeList:
+  - hu.dojcsak.openrewrite.recipe.boot.MigrateApplicationPropertiesToYaml
