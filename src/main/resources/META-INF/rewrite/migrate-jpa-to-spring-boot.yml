@@ -15,6 +15,9 @@ description: >-
   Adds @Transactional to @Service beans as a replacement for EJB Container-Managed Transactions (CMT).
   Removes the unitName attribute from @PersistenceContext annotations, as Spring Boot uses
   a single default persistence unit.
+  Replaces date.toInstant() with Instant.ofEpochMilli(date.getTime()) on java.util.Date-typed
+  expressions, fixing the UnsupportedOperationException thrown by java.sql.Date.toInstant()
+  when Hibernate returns java.sql.Date for @Temporal(TemporalType.DATE) mapped fields.
 tags:
   - jee
   - jpa
@@ -52,10 +55,13 @@ recipeList:
       groupId: com.oracle.weblogic
       artifactId: com.oracle.weblogic.persistence
 
-  # 5. Add @Transactional to @Service beans as replacement for EJB CMT
+  # 4. Add @Transactional to @Service beans as replacement for EJB CMT
   - hu.dojcsak.openrewrite.recipe.jee.ejb.AddTransactionalToServiceBeans
 
-  # 6. Remove unitName from @PersistenceContext (Spring Boot uses a single default unit)
+  # 5. Remove unitName from @PersistenceContext (Spring Boot uses a single default unit)
   - org.openrewrite.java.RemoveAnnotationAttribute:
       annotationType: javax.persistence.PersistenceContext
       attributeName: unitName
+
+  # 6. Fix java.sql.Date.toInstant() UnsupportedOperationException on @Temporal(TemporalType.DATE) fields
+  - hu.dojcsak.openrewrite.recipe.jee.jpa.FixDateToInstant
