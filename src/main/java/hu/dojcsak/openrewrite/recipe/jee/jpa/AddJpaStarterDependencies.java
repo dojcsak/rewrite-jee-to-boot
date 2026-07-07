@@ -4,8 +4,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -14,12 +15,21 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Adds {@code spring-boot-starter-data-jpa} and {@code h2} (runtime) to a pom.xml file
- * when the Maven module it represents contains Java sources that use {@code javax.persistence.*}.
+ * Adds {@code spring-boot-starter-data-jpa} to every pom.xml file whose Maven module contains
+ * Java sources that use {@code javax.persistence.*}, and adds {@code h2} (runtime) to the module
+ * that boots the application ({@code @SpringBootApplication}) — provided that module depends,
+ * directly or transitively, on a module using JPA.
+ *
+ * <p>H2 is a runtime concern of the executable application, not of the modules that merely
+ * declare JPA entities/repositories, so in a multi-module reactor it is targeted at the
+ * {@code @SpringBootApplication} module rather than at every module using JPA. When no such
+ * application module can be identified, or none of the ones found depend on a JPA module, this
+ * falls back to the single-module behaviour of adding H2 alongside the starter, in the module
+ * using JPA directly — this guarantees H2 always ends up on a usable classpath.
  *
  * <p>The module boundary is derived from the source path: everything before the {@code src/}
  * segment is the module root. Only pom.xml files whose parent directory matches a module root
- * that has JPA usage receive the new dependencies — matching the per-module semantics of
+ * that has JPA usage receive the starter — matching the per-module semantics of
  * {@code AddDependency}'s {@code onlyIfUsing} parameter.
  *
  * <p>Versions are intentionally omitted: the Spring Boot BOM (added by
@@ -52,6 +62,12 @@ public class AddJpaStarterDependencies
          * An empty string represents the project root module.
          */
         final Set<String> moduleRootsWithJpa = new HashSet<>();
+
+        /** Module roots containing a class annotated with {@code @SpringBootApplication}. */
+        final Set<String> springBootAppModuleRoots = new HashSet<>();
+
+        /** Module root -> that module's own resolved Maven pom, used to test reachability. */
+        final Map<String, MavenResolutionResult> moduleRootToMaven = new HashMap<>();
     }
 
     // -------------------------------------------------------------------------
@@ -65,9 +81,10 @@ public class AddJpaStarterDependencies
 
     @Override
     public String getDescription() {
-        return "Adds spring-boot-starter-data-jpa and H2 runtime dependency to a pom.xml file " +
-               "when the Maven module it represents contains Java sources that use " +
-               "javax.persistence.* types. Version management is delegated to the Spring Boot BOM.";
+        return "Adds spring-boot-starter-data-jpa to every Maven module whose Java sources use " +
+               "javax.persistence.* types, and adds the H2 runtime dependency to the module " +
+               "containing the @SpringBootApplication class, provided it depends on a module " +
+               "using JPA. Version management is delegated to the Spring Boot BOM.";
     }
 
     // -------------------------------------------------------------------------
@@ -79,40 +96,96 @@ public class AddJpaStarterDependencies
         return new Acc();
     }
 
+    private static final AnnotationMatcher SPRING_BOOT_APPLICATION_MATCHER =
+            new AnnotationMatcher("@org.springframework.boot.autoconfigure.SpringBootApplication");
+
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Acc acc) {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                boolean usesJpa = cu.getImports().stream()
-                        .anyMatch(imp -> imp.getTypeName().startsWith("javax.persistence"));
-                if (usesJpa) {
-                    acc.moduleRootsWithJpa.add(moduleRoot(cu.getSourcePath()));
+            public Tree visit(Tree tree, ExecutionContext ctx) {
+                if (tree instanceof J.CompilationUnit) {
+                    scanCompilationUnit((J.CompilationUnit) tree, acc);
+                } else if (tree instanceof Xml.Document && isPomXml((Xml.Document) tree)) {
+                    scanPom((Xml.Document) tree, acc);
                 }
-                return cu;
+                return tree;
             }
         };
+    }
+
+    private static void scanCompilationUnit(J.CompilationUnit cu, Acc acc) {
+        boolean usesJpa = cu.getImports().stream()
+                .anyMatch(imp -> imp.getTypeName().startsWith("javax.persistence"));
+        if (usesJpa) {
+            acc.moduleRootsWithJpa.add(moduleRoot(cu.getSourcePath()));
+        }
+        boolean isSpringBootApp = cu.getClasses().stream()
+                .anyMatch(cd -> cd.getLeadingAnnotations().stream()
+                        .anyMatch(SPRING_BOOT_APPLICATION_MATCHER::matches));
+        if (isSpringBootApp) {
+            acc.springBootAppModuleRoots.add(moduleRoot(cu.getSourcePath()));
+        }
+    }
+
+    private static void scanPom(Xml.Document doc, Acc acc) {
+        doc.getMarkers().findFirst(MavenResolutionResult.class)
+                .ifPresent(mrr -> acc.moduleRootToMaven.put(moduleDirOf(doc), mrr));
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Acc acc) {
         if (acc.moduleRootsWithJpa.isEmpty()) return TreeVisitor.noop();
+        Set<String> h2Targets = resolveH2Targets(acc);
         return new XmlIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document d = super.visitDocument(document, ctx);
                 if (!isPomXml(d)) return d;
 
-                Path pomParent = d.getSourcePath().getParent();
-                String moduleDir = pomParent != null
-                        ? pomParent.toString().replace('\\', '/') : "";
-                if (!acc.moduleRootsWithJpa.contains(moduleDir)) return d;
-
-                doAfterVisit(new RawDepAdder(STARTER_GROUP, STARTER_ARTIFACT, null, null));
-                doAfterVisit(new RawDepAdder(H2_GROUP, H2_ARTIFACT, null, "runtime"));
+                String moduleDir = moduleDirOf(d);
+                if (acc.moduleRootsWithJpa.contains(moduleDir)) {
+                    doAfterVisit(new RawDepAdder(STARTER_GROUP, STARTER_ARTIFACT, null, null));
+                }
+                if (h2Targets.contains(moduleDir)) {
+                    doAfterVisit(new RawDepAdder(H2_GROUP, H2_ARTIFACT, null, "runtime"));
+                }
                 return d;
             }
         };
+    }
+
+    /**
+     * Determines which module(s) should receive the H2 runtime dependency: the
+     * {@code @SpringBootApplication} module(s) that depend - directly or transitively - on a
+     * module using JPA. Falls back to {@code moduleRootsWithJpa} (the pre-existing, per-module
+     * placement) when no application module is found, or none of the ones found are wired to a
+     * JPA module - so H2 is never silently dropped.
+     */
+    private static Set<String> resolveH2Targets(Acc acc) {
+        Set<String> targets = new HashSet<>();
+        for (String appRoot : acc.springBootAppModuleRoots) {
+            if (acc.moduleRootsWithJpa.contains(appRoot)) {
+                targets.add(appRoot);
+                continue;
+            }
+            MavenResolutionResult appMaven = acc.moduleRootToMaven.get(appRoot);
+            if (appMaven == null) continue;
+            for (String jpaRoot : acc.moduleRootsWithJpa) {
+                MavenResolutionResult jpaMaven = acc.moduleRootToMaven.get(jpaRoot);
+                if (jpaMaven != null && !appMaven.findDependencies(
+                        jpaMaven.getPom().getGroupId(), jpaMaven.getPom().getArtifactId(), null).isEmpty()) {
+                    targets.add(appRoot);
+                    break;
+                }
+            }
+        }
+        return targets.isEmpty() ? acc.moduleRootsWithJpa : targets;
+    }
+
+    private static String moduleDirOf(Xml.Document doc) {
+        Path parent = doc.getSourcePath().getParent();
+        return parent != null ? parent.toString().replace('\\', '/') : "";
     }
 
     // -------------------------------------------------------------------------

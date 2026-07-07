@@ -62,6 +62,9 @@ dependencies {
     testRuntimeOnly("org.springframework:spring-context:5.3.39")
     testRuntimeOnly("org.springframework:spring-tx:5.3.39")
 
+    // @SpringBootApplication type needed by classpath() lookup in AddJpaStarterDependencies tests
+    testRuntimeOnly("org.springframework.boot:spring-boot-autoconfigure:2.7.18")
+
     // Support for parsing different Java versions
     testRuntimeOnly("org.openrewrite:rewrite-java-17")
     testRuntimeOnly("org.openrewrite:rewrite-java-21")

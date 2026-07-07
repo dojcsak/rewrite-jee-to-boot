@@ -6,7 +6,9 @@ description: >-
   Extracts JPA/Hibernate properties from persistence.xml, maps them to Spring Boot
   application.properties equivalents (creating the file if necessary), and deletes persistence.xml.
   Properties with no automatic mapping (e.g. JNDI data sources, cache providers) are skipped.
-  Adds spring-boot-starter-data-jpa and H2 runtime dependency (only if javax.persistence.* is used).
+  Adds spring-boot-starter-data-jpa to every module using javax.persistence.*, and adds the H2
+  runtime dependency to the module containing the @SpringBootApplication class (falling back to
+  the javax.persistence.* module when no such application module can be identified or wired up).
   Removes explicit Hibernate dependencies (hibernate-core, hibernate-entitymanager, hibernate,
   hibernate-hikaricp, ejb3-persistence, hibernate-jpa-2.1-api, openejb-core-hibernate,
   com.oracle.weblogic.persistence) that are transitively managed by the starter.
