@@ -29,6 +29,24 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class MarkRemoteEjbs extends Recipe {
 
+    /**
+     * Trailing part of the TODO comment this recipe leaves behind on marked classes/interfaces.
+     * Shared with {@link DeleteUnusedRemoteInterfaces}, which uses it to recognize files this
+     * recipe has already processed.
+     */
+    public static final String TODO_MARKER_SUFFIX = "removed - expose as REST API (e.g. @RestController)";
+
+    /**
+     * Returns true if the class/interface declaration's prefix carries the TODO marker comment
+     * left behind by this recipe.
+     */
+    public static boolean hasRemoteTodoMarker(J.ClassDeclaration cd) {
+        return cd.getPrefix().getComments().stream()
+                .filter(c -> c instanceof TextComment)
+                .map(c -> ((TextComment) c).getText())
+                .anyMatch(text -> text.contains(TODO_MARKER_SUFFIX));
+    }
+
     @Override
     public String getDisplayName() {
         return "Remove @Remote EJB annotation and mark for manual REST migration";
@@ -121,7 +139,7 @@ public class MarkRemoteEjbs extends Recipe {
                 String lineEnding = detectLineEnding(cd, prefix, cu);
                 List<Comment> comments = new ArrayList<>(prefix.getComments());
                 comments.add(new TextComment(false,
-                        " TODO: " + remoteAnnotationText + " removed - expose as REST API (e.g. @RestController)",
+                        " TODO: " + remoteAnnotationText + " " + TODO_MARKER_SUFFIX,
                         lineEnding + indentation,
                         Markers.EMPTY));
                 cd = cd.withPrefix(prefix.withComments(comments));

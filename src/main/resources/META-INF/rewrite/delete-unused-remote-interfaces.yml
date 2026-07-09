@@ -1,0 +1,14 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: hu.dojcsak.openrewrite.recipe.DeleteUnusedRemoteInterfaces
+displayName: Delete unused @Remote EJB interfaces
+description: >-
+  Deletes @Remote EJB interfaces previously marked by MarkRemoteEjbs that have no
+  remaining reference anywhere in the file set other than an implements/extends clause,
+  which is stripped along with the deleted interface. Interfaces with any other reference
+  are left untouched for manual review. Only interfaces are deleted; @Remote bean classes
+  are never removed.
+tags:
+  - jee
+  - ejb
+recipeList:
+  - hu.dojcsak.openrewrite.recipe.jee.ejb.DeleteUnusedRemoteInterfaces
