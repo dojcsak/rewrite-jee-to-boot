@@ -13,7 +13,10 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,11 +28,16 @@ import java.util.regex.Pattern;
  * Replaces {@code @EJB} injection (field and setter) with Spring {@code @Autowired}.
  * If the {@code @EJB} annotation carries a {@code beanName} string-literal attribute,
  * a corresponding {@code @Qualifier} annotation is added. Attributes that cannot be
- * automatically migrated ({@code lookup}, {@code beanInterface}, non-empty {@code name},
+ * automatically migrated ({@code beanInterface}, non-empty {@code name},
  * non-empty {@code mappedName}, non-empty {@code description}) are flagged with TODO
- * comments. A non-literal {@code beanName}, {@code lookup}, or {@code mappedName}
- * (constant reference) is also flagged. Empty-string values for {@code name},
- * {@code lookup}, and {@code mappedName} are treated as absent (EJB spec default).
+ * comments and {@code @Autowired} is not emitted. A non-literal {@code beanName},
+ * {@code lookup}, or {@code mappedName} (constant reference) is also flagged this way.
+ * A {@code lookup} attribute is flagged with a TODO comment too, but {@code @Autowired}
+ * is still added as long as the declared field/parameter type is not a {@code @Remote}
+ * business interface (directly or via superinterface) - Spring resolves {@code @Autowired}
+ * by type regardless of the original JNDI lookup name, whereas a {@code @Remote} target needs
+ * a manual decision about how to reach it from Spring Boot. Empty-string values for
+ * {@code name}, {@code lookup}, and {@code mappedName} are treated as absent (EJB spec default).
  * Constructor-level {@code @EJB} annotations are not processed (EJB does not support
  * constructor injection).
  */
@@ -47,8 +55,10 @@ public class MigrateEjbAnnotations extends Recipe {
 
     String description = "Replaces @EJB field and setter injection with Spring @Autowired. " +
             "Adds @Qualifier if the @EJB annotation has a beanName attribute. " +
-            "Lookup, beanInterface, name, mappedName, and non-empty description attributes are flagged with TODO comments. " +
-            "A non-literal beanName, lookup, or mappedName (constant reference) is also flagged. " +
+            "BeanInterface, name, mappedName, and non-empty description attributes are flagged with TODO comments " +
+            "and @Autowired is not added. A non-literal beanName, lookup, or mappedName (constant reference) is also " +
+            "flagged this way. A lookup attribute is flagged with a TODO comment too, but @Autowired is still added " +
+            "unless the declared type is a @Remote business interface (or unresolvable). " +
             "Constructor-level @EJB annotations are not processed.";
 
     @Override
@@ -115,9 +125,10 @@ public class MigrateEjbAnnotations extends Recipe {
                 maybeRemoveImport("javax.ejb.EJB");
                 updateCursor(m);
 
-                if (StringUtils.isNotEmpty(lookup) || hasBeanInterface || hasNonLiteralBeanName || hasEjbNameAttr ||
+                boolean hasLookup = StringUtils.isNotEmpty(lookup);
+                if (hasBeanInterface || hasNonLiteralBeanName || hasEjbNameAttr ||
                         hasNonLiteralLookup || StringUtils.isNotEmpty(mappedName) || hasNonLiteralMappedName ||
-                        hasEjbDescriptionAttr) {
+                        hasEjbDescriptionAttr || (hasLookup && lookupBlocksAutowiring(singleParameterType(m)))) {
                     // Cannot auto-migrate — add TODO comment without @Autowired
                     return flagWithTodoComment(m,
                             "TODO: " + ejbAnnotationText + " could not be automatically migrated");
@@ -130,6 +141,16 @@ public class MigrateEjbAnnotations extends Recipe {
                         .apply(getCursor(), m.getCoordinates().addAnnotation(
                                 Comparator.comparing(J.Annotation::getSimpleName)));
                 maybeAddImport("org.springframework.beans.factory.annotation.Autowired", false);
+
+                if (hasLookup) {
+                    // lookup has no direct Spring construct, but the declared parameter type is a
+                    // local (non-@Remote) interface, so @Autowired resolves it correctly by type.
+                    // Keep the TODO comment so the original JNDI lookup stays visible for review.
+                    updateCursor(m);
+                    m = prependTodoBeforeFirstAnnotation(m,
+                            "TODO: " + ejbAnnotationText + " could not be automatically migrated");
+                    updateCursor(m);
+                }
 
                 if (StringUtils.isNotEmpty(beanName)) {
                     updateCursor(m);
@@ -184,9 +205,10 @@ public class MigrateEjbAnnotations extends Recipe {
                 maybeRemoveImport("javax.ejb.EJB");
                 updateCursor(mv);
 
-                if (StringUtils.isNotEmpty(lookup) || hasBeanInterface || hasNonLiteralBeanName || hasEjbNameAttr ||
+                boolean hasLookup = StringUtils.isNotEmpty(lookup);
+                if (hasBeanInterface || hasNonLiteralBeanName || hasEjbNameAttr ||
                         hasNonLiteralLookup || StringUtils.isNotEmpty(mappedName) || hasNonLiteralMappedName ||
-                        hasEjbDescriptionAttr) {
+                        hasEjbDescriptionAttr || (hasLookup && lookupBlocksAutowiring(mv.getType()))) {
                     // Cannot auto-migrate — add TODO comment without @Autowired
                     return flagWithTodoComment(mv,
                             "TODO: " + ejbAnnotationText + " could not be automatically migrated");
@@ -199,6 +221,16 @@ public class MigrateEjbAnnotations extends Recipe {
                         .apply(getCursor(), mv.getCoordinates().addAnnotation(
                                 Comparator.comparing(J.Annotation::getSimpleName)));
                 maybeAddImport("org.springframework.beans.factory.annotation.Autowired", false);
+
+                if (hasLookup) {
+                    // lookup has no direct Spring construct, but the declared field type is a
+                    // local (non-@Remote) interface, so @Autowired resolves it correctly by type.
+                    // Keep the TODO comment so the original JNDI lookup stays visible for review.
+                    updateCursor(mv);
+                    mv = prependTodoBeforeFirstAnnotation(mv,
+                            "TODO: " + ejbAnnotationText + " could not be automatically migrated");
+                    updateCursor(mv);
+                }
 
                 if (StringUtils.isNotEmpty(beanName)) {
                     updateCursor(mv);
@@ -218,11 +250,13 @@ public class MigrateEjbAnnotations extends Recipe {
                 return mv;
             }
 
-            // Adds a TODO comment before the field. The leading whitespace of the first token
-            // (modifier or type expression) is moved to the comment's suffix so the field stays
-            // on the next line at the correct indentation with no extra blank lines.
-            // Falls back to no-op only when neither modifiers nor a type expression are present,
-            // which cannot occur in valid Java source.
+            // Adds a TODO comment before the field, used only when @Autowired is NOT going to be
+            // added (the field has no leading annotations at this point). The leading whitespace of
+            // the first token (modifier or type expression) becomes the comment's suffix so the field
+            // stays on the next line at the correct indentation; that same whitespace is also what the
+            // declaration's own top-level prefix already accounts for, so it is zeroed out here to
+            // avoid a doubled, blank-line-producing newline. Falls back to no-op only when neither
+            // modifiers nor a type expression are present, which cannot occur in valid Java source.
             private J.VariableDeclarations flagWithTodoComment(J.VariableDeclarations mv, String message) {
                 List<J.Modifier> modifiers = mv.getModifiers();
                 if (!modifiers.isEmpty()) {
@@ -284,6 +318,82 @@ public class MigrateEjbAnnotations extends Recipe {
                             returnPrefix.withComments(comments).withWhitespace("")));
                 }
                 return m;
+            }
+
+            // Adds a TODO comment before the first leading annotation (@Autowired, added despite a
+            // lookup attribute), so the comment reads above the code it explains instead of below it -
+            // consistent with how MigrateStatelessSessionBeans flags its own TODOs before @Service.
+            // JavaTemplate gives a freshly inserted sole annotation an empty prefix (the indentation
+            // before it comes from the declaration's own top-level prefix instead), so the comment's
+            // suffix is rebuilt from just that prefix's indentation (not its full whitespace, which
+            // for a member after a blank-line gap would otherwise reproduce the blank line a second
+            // time between the comment and the annotation).
+            private J.VariableDeclarations prependTodoBeforeFirstAnnotation(J.VariableDeclarations mv, String message) {
+                List<J.Annotation> annotations = mv.getLeadingAnnotations();
+                J.Annotation first = annotations.get(0);
+                org.openrewrite.java.tree.Space prefix = first.getPrefix();
+                org.openrewrite.java.tree.Comment comment = new org.openrewrite.java.tree.TextComment(
+                        false, " " + message,
+                        singleLineIndentSuffix(mv.getPrefix()),
+                        org.openrewrite.marker.Markers.EMPTY);
+                List<org.openrewrite.java.tree.Comment> comments = new ArrayList<>(prefix.getComments());
+                comments.add(comment);
+                List<J.Annotation> newAnnotations = new ArrayList<>(annotations);
+                newAnnotations.set(0, first.withPrefix(prefix.withComments(comments)));
+                return mv.withLeadingAnnotations(newAnnotations);
+            }
+
+            // Same as above but for method declarations (setter injection).
+            private J.MethodDeclaration prependTodoBeforeFirstAnnotation(J.MethodDeclaration m, String message) {
+                List<J.Annotation> annotations = m.getLeadingAnnotations();
+                J.Annotation first = annotations.get(0);
+                org.openrewrite.java.tree.Space prefix = first.getPrefix();
+                org.openrewrite.java.tree.Comment comment = new org.openrewrite.java.tree.TextComment(
+                        false, " " + message,
+                        singleLineIndentSuffix(m.getPrefix()),
+                        org.openrewrite.marker.Markers.EMPTY);
+                List<org.openrewrite.java.tree.Comment> comments = new ArrayList<>(prefix.getComments());
+                comments.add(comment);
+                List<J.Annotation> newAnnotations = new ArrayList<>(annotations);
+                newAnnotations.set(0, first.withPrefix(prefix.withComments(comments)));
+                return m.withLeadingAnnotations(newAnnotations);
+            }
+
+            // A single newline (matching the declaration's own line ending style) plus its indentation -
+            // i.e. declPrefix's whitespace with any leading blank-line newlines collapsed to one.
+            private String singleLineIndentSuffix(org.openrewrite.java.tree.Space declPrefix) {
+                String newline = declPrefix.getWhitespace().contains("\r\n") ? "\r\n" : "\n";
+                return newline + declPrefix.getIndent();
+            }
+
+            // A lookup value has no direct Spring construct (arbitrary JNDI name), so it falls back to
+            // by-type autowiring: Spring resolves @Autowired by the declared type regardless of the
+            // original JNDI name. That is unsafe when the declared type is a @Remote business
+            // interface - @Remote signals the target was designed for out-of-process access and
+            // needs a manual decision (REST client, messaging, etc.) rather than same-JVM autowiring -
+            // or when the type cannot be resolved at all.
+            private boolean lookupBlocksAutowiring(JavaType type) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+                return fq == null || isRemoteInterface(fq);
+            }
+
+            // Walks the interface's own superinterface hierarchy so @Remote is detected whether
+            // it's declared directly or inherited (e.g. FooRemote extends @Remote BaseRemote).
+            private boolean isRemoteInterface(JavaType.FullyQualified iface) {
+                if (iface.getAnnotations().stream()
+                        .anyMatch(a -> "javax.ejb.Remote".equals(a.getFullyQualifiedName()))) {
+                    return true;
+                }
+                return iface.getInterfaces().stream().anyMatch(this::isRemoteInterface);
+            }
+
+            // Setter injection's target type is its single parameter's declared type.
+            private JavaType singleParameterType(J.MethodDeclaration m) {
+                List<Statement> params = m.getParameters();
+                if (params.size() == 1 && params.get(0) instanceof J.VariableDeclarations) {
+                    return ((J.VariableDeclarations) params.get(0)).getType();
+                }
+                return null;
             }
 
             // Strips block and line comments and normalises whitespace/parens in the annotation's

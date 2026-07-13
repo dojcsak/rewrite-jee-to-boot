@@ -145,15 +145,18 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
           java(
                   """
                           import javax.ejb.EJB;
-                          
+
                           class OrderService {
                               @EJB(lookup = "app/PaymentService")
                               private PaymentService paymentService;
                           }
                           """,
                   """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
                           class OrderService {
                               // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated
+                              @Autowired
                               private PaymentService paymentService;
                           }
                           """
@@ -168,10 +171,10 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
           java(
                   """
                           import javax.ejb.EJB;
-                          
+
                           class OrderService {
                               private PaymentService paymentService;
-                          
+
                               @EJB(lookup = "app/PaymentService")
                               public void setPaymentService(PaymentService paymentService) {
                                   this.paymentService = paymentService;
@@ -179,10 +182,13 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
                           }
                           """,
                   """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
                           class OrderService {
                               private PaymentService paymentService;
-                          
+
                               // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated
+                              @Autowired
                               public void setPaymentService(PaymentService paymentService) {
                                   this.paymentService = paymentService;
                               }
@@ -286,15 +292,18 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
           java(
                   """
                           import javax.ejb.EJB;
-                          
+
                           class OrderService {
                               @EJB(lookup = "app/PaymentService")
                               PaymentService paymentService;
                           }
                           """,
                   """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
                           class OrderService {
                               // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated
+                              @Autowired
                               PaymentService paymentService;
                           }
                           """
@@ -309,10 +318,10 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
           java(
                   """
                           import javax.ejb.EJB;
-                          
+
                           class OrderService {
                               PaymentService paymentService;
-                          
+
                               @EJB(lookup = "app/PaymentService")
                               void setPaymentService(PaymentService paymentService) {
                                   this.paymentService = paymentService;
@@ -320,13 +329,115 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
                           }
                           """,
                   """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
                           class OrderService {
                               PaymentService paymentService;
-                          
+
                               // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated
+                              @Autowired
                               void setPaymentService(PaymentService paymentService) {
                                   this.paymentService = paymentService;
                               }
+                          }
+                          """
+          )
+        );
+    }
+
+    @Test
+    void noAutowiredWhenLookupPresentAndTypeIsRemote() {
+        rewriteRun(
+          java(
+                  """
+                          import javax.ejb.Remote;
+
+                          @Remote
+                          interface PaymentService {}
+                          """
+          ),
+          java(
+                  """
+                          import javax.ejb.EJB;
+
+                          class OrderService {
+                              @EJB(lookup = "app/PaymentService")
+                              private PaymentService paymentService;
+                          }
+                          """,
+                  """
+                          class OrderService {
+                              // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated
+                              private PaymentService paymentService;
+                          }
+                          """
+          )
+        );
+    }
+
+    @Test
+    void noAutowiredWhenLookupPresentAndTypeIsRemoteOnSetter() {
+        rewriteRun(
+          java(
+                  """
+                          import javax.ejb.Remote;
+
+                          @Remote
+                          interface PaymentService {}
+                          """
+          ),
+          java(
+                  """
+                          import javax.ejb.EJB;
+
+                          class OrderService {
+                              private PaymentService paymentService;
+
+                              @EJB(lookup = "app/PaymentService")
+                              public void setPaymentService(PaymentService paymentService) {
+                                  this.paymentService = paymentService;
+                              }
+                          }
+                          """,
+                  """
+                          class OrderService {
+                              private PaymentService paymentService;
+
+                              // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated
+                              public void setPaymentService(PaymentService paymentService) {
+                                  this.paymentService = paymentService;
+                              }
+                          }
+                          """
+          )
+        );
+    }
+
+    @Test
+    void noAutowiredWhenLookupPresentAndTypeIsInheritedRemote() {
+        rewriteRun(
+          java(
+                  """
+                          import javax.ejb.Remote;
+
+                          @Remote
+                          interface BasePaymentService {}
+                          """
+          ),
+          java("interface PaymentService extends BasePaymentService {}"),
+          java(
+                  """
+                          import javax.ejb.EJB;
+
+                          class OrderService {
+                              @EJB(lookup = "app/PaymentService")
+                              private PaymentService paymentService;
+                          }
+                          """,
+                  """
+                          class OrderService {
+                              // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated
+                              private PaymentService paymentService;
                           }
                           """
           )
@@ -442,15 +553,18 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
           java(
                   """
                           import javax.ejb.EJB;
-                          
+
                           class OrderService {
                               @EJB(/* JNDI */ lookup = "app/PaymentService")
                               private PaymentService paymentService;
                           }
                           """,
                   """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
                           class OrderService {
                               // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated
+                              @Autowired
                               private PaymentService paymentService;
                           }
                           """
@@ -465,7 +579,7 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
           java(
                   """
                           import javax.ejb.EJB;
-                          
+
                           class OrderService {
                               @EJB(/*
                                    JNDI
@@ -474,8 +588,11 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
                           }
                           """,
                   """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
                           class OrderService {
                               // TODO: @EJB(lookup = "app/PaymentService") could not be automatically migrated
+                              @Autowired
                               private PaymentService paymentService;
                           }
                           """
@@ -490,15 +607,18 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
           java(
                   """
                           import javax.ejb.EJB;
-                          
+
                           class OrderService {
                               @EJB(lookup = "app//* alias */PaymentService")
                               private PaymentService paymentService;
                           }
                           """,
                   """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
                           class OrderService {
                               // TODO: @EJB(lookup = "app//* alias */PaymentService") could not be automatically migrated
+                              @Autowired
                               private PaymentService paymentService;
                           }
                           """
@@ -513,15 +633,18 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
           java(
                   """
                           import javax.ejb.EJB;
-                          
+
                           class OrderService {
                               @EJB(lookup = "app/payment (service)")
                               private PaymentService paymentService;
                           }
                           """,
                   """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
                           class OrderService {
                               // TODO: @EJB(lookup = "app/payment (service)") could not be automatically migrated
+                              @Autowired
                               private PaymentService paymentService;
                           }
                           """
