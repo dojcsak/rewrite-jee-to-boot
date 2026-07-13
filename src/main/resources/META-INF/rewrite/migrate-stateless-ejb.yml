@@ -4,9 +4,11 @@ displayName: Migrate stateless EJB to Spring Boot
 description: >-
   Migrates stateless EJB components to Spring Boot 2.7.x services.
   Replaces @EJB field/setter injection with @Autowired, adding @Qualifier when beanName is a string
-  literal; flags lookup, beanInterface, name, mappedName, non-empty description, and non-literal
-  beanName/lookup/mappedName with a TODO comment instead of migrating automatically; skips
-  constructor-level @EJB (EJB does not support constructor injection).
+  literal; flags beanInterface, name, mappedName, non-empty description, and non-literal
+  beanName/lookup/mappedName with a TODO comment instead of migrating automatically; flags lookup
+  with a TODO comment too but still adds @Autowired unless the declared type is a @Remote business
+  interface (or unresolvable); skips constructor-level @EJB (EJB does not support constructor
+  injection).
   Replaces @Stateless/@Singleton with @Service (preserving the name string-literal attribute);
   removes @Local, @LocalBean, and @Startup from bean classes and interfaces; flags mappedName,
   description, non-literal name, and @Startup removal with a search result comment; skips beans

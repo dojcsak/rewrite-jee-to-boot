@@ -13,9 +13,13 @@ Replaces `@EJB` on fields and setter methods with Spring `@Autowired`.
 
 - If `beanName` is a string literal, a corresponding `@Qualifier("name")` is added.
 - The following cases cannot be automatically migrated — a `// TODO:` comment is added instead and `@Autowired` is **not** emitted:
-  - `lookup` or `beanInterface` is set
+  - `beanInterface` is set
   - `name`, `mappedName`, or non-empty `description` is set
   - `beanName`, `lookup`, or `mappedName` is a constant reference (non-literal)
+- `lookup` is flagged with a `// TODO:` comment too, but `@Autowired` is still added, provided the declared
+  field/parameter type is not a `@Remote` business interface (directly or via superinterface) or otherwise
+  unresolvable. Spring resolves `@Autowired` by type regardless of the original JNDI lookup name; a `@Remote`
+  target needs a manual decision (REST client, messaging, etc.) instead.
 - Constructor-level `@EJB` annotations are not processed (EJB does not support constructor injection).
 
 ### 2. Replace session bean annotations with `@Service`
