@@ -3,6 +3,7 @@ package hu.dojcsak.openrewrite.recipe.jee.ejb;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -29,7 +30,9 @@ import java.util.List;
  * <ul>
  *   <li>{@code @Stateless} → {@code @Service} (preserving {@code name} as {@code @Service("name")})</li>
  *   <li>{@code @Singleton} → {@code @Service} (removing {@code @Startup})</li>
- *   <li>Removes {@code @Local} and {@code @LocalBean} from bean classes and interfaces</li>
+ *   <li>Removes {@code @Local} and {@code @LocalBean} from bean classes and interfaces, including
+ *       classes without {@code @Stateless}/{@code @Singleton} themselves (e.g. an abstract base
+ *       class an Andromda-style bean extends, carrying {@code @Local} purely as bean metadata)</li>
  *   <li>Flags {@code mappedName} and {@code description} with TODO comments for manual review</li>
  *   <li>Skips beans that implement a {@code @Remote} interface (directly or through supertype),
  *       or that are directly annotated with {@code @Remote}</li>
@@ -40,11 +43,14 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class MigrateStatelessSessionBeans extends Recipe {
 
+    private static final AnnotationMatcher REMOTE_MATCHER = new AnnotationMatcher("@javax.ejb.Remote");
+
     String displayName = "Migrate @Stateless and @Singleton EJBs to @Service";
 
     String description = "Replaces @Stateless and @Singleton EJB annotations with Spring @Service. " +
             "Removes @Local, @LocalBean, and @Startup annotations. " +
-            "Removes @Local and @LocalBean from business interfaces. " +
+            "Removes @Local and @LocalBean from business interfaces, and from any other class that " +
+            "carries them without @Stateless/@Singleton (e.g. an abstract base class). " +
             "Flags mappedName and description attributes with TODO comments for manual review. " +
             "Session beans implementing a @Remote interface are not migrated.";
 
@@ -56,7 +62,6 @@ public class MigrateStatelessSessionBeans extends Recipe {
             private final AnnotationMatcher localMatcher = new AnnotationMatcher("@javax.ejb.Local");
             private final AnnotationMatcher localBeanMatcher = new AnnotationMatcher("@javax.ejb.LocalBean");
             private final AnnotationMatcher startupMatcher = new AnnotationMatcher("@javax.ejb.Startup");
-            private final AnnotationMatcher remoteMatcher = new AnnotationMatcher("@javax.ejb.Remote");
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(
@@ -65,17 +70,23 @@ public class MigrateStatelessSessionBeans extends Recipe {
 
                 // Remove @Local and @LocalBean from business interfaces
                 if (cd.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
-                    return removeLocalFromInterface(cd);
+                    return removeLocalAndLocalBeanAnnotations(cd);
                 }
 
                 boolean hasStateless = cd.getLeadingAnnotations().stream().anyMatch(statelessMatcher::matches);
                 boolean hasSingleton = cd.getLeadingAnnotations().stream().anyMatch(singletonMatcher::matches);
                 if (!hasStateless && !hasSingleton) {
-                    return cd;
+                    // Not an EJB session bean itself - e.g. an abstract base class an Andromda-style
+                    // bean extends, which carries @Local({FooLocal.class}) purely as bean metadata
+                    // without @Stateless/@Singleton on itself. Still strip any lingering @Local/
+                    // @LocalBean here: this class is never visited again below (the @Stateless/
+                    // @Singleton branch only runs on the concrete bean), so without this it would
+                    // survive migration untouched.
+                    return removeLocalAndLocalBeanAnnotations(cd);
                 }
 
                 // Beans with @Remote are distributed components — skip migration
-                if (isRemoteBean(cd)) {
+                if (isRemoteBean(cd, getCursor())) {
                     J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
                     log.warn("Skipped @Remote EJB bean '{}' in {}: manual migration to Spring required",
                             cd.getSimpleName(), cu.getSourcePath());
@@ -152,8 +163,23 @@ public class MigrateStatelessSessionBeans extends Recipe {
                 return cd;
             }
 
-            private J.ClassDeclaration removeLocalFromInterface(J.ClassDeclaration cd) {
-                boolean hasLocal = cd.getLeadingAnnotations().stream().anyMatch(localMatcher::matches);
+            // Strips @Local/@LocalBean from a business interface, or from any other class that
+            // carries them without also carrying @Stateless/@Singleton (e.g. an abstract base class).
+            //
+            // A class-level @Local({X.class, ...}) on such a non-interface, non-bean class is only
+            // stripped once none of its listed values still resolve to a genuine interface (see
+            // isSafeToStripLocal): InlineLocalBeanInterfaces may have deliberately left the
+            // corresponding interface un-inlined (e.g. a cross-module reference it couldn't
+            // resolve), in which case the annotation is still accurate metadata and stripping it
+            // here would destroy that context for no benefit. Once InlineLocalBeanInterfaces has
+            // retyped the value to the concrete implementor class, it's safe to remove. A bare
+            // @Local (no value) and @LocalBean (no interface reference at all) are always safe.
+            private J.ClassDeclaration removeLocalAndLocalBeanAnnotations(J.ClassDeclaration cd) {
+                J.Annotation localAnnotation = cd.getLeadingAnnotations().stream()
+                        .filter(localMatcher::matches)
+                        .findFirst()
+                        .orElse(null);
+                boolean hasLocal = localAnnotation != null && isSafeToStripLocal(cd, localAnnotation);
                 boolean hasLocalBean = cd.getLeadingAnnotations().stream().anyMatch(localBeanMatcher::matches);
                 if (!hasLocal && !hasLocalBean) {
                     return cd;
@@ -164,7 +190,8 @@ public class MigrateStatelessSessionBeans extends Recipe {
                 boolean firstAnnotationHasNoNewline = !cd.getLeadingAnnotations().isEmpty() &&
                         !cd.getLeadingAnnotations().get(0).getPrefix().getWhitespace().contains("\n");
                 List<J.Annotation> annotations = new ArrayList<>(cd.getLeadingAnnotations());
-                annotations.removeIf(a -> localMatcher.matches(a) || localBeanMatcher.matches(a));
+                annotations.removeIf(a ->
+                        (hasLocal && localMatcher.matches(a)) || (hasLocalBean && localBeanMatcher.matches(a)));
                 cd = cd.withLeadingAnnotations(annotations);
                 if (annotations.isEmpty() && firstAnnotationHasNoNewline) {
                     cd = stripOneLeadingNewlineFromFirstToken(cd);
@@ -179,52 +206,6 @@ public class MigrateStatelessSessionBeans extends Recipe {
                 return cd;
             }
 
-            private boolean isRemoteBean(J.ClassDeclaration classDecl) {
-                if (classDecl.getLeadingAnnotations().stream().anyMatch(remoteMatcher::matches)) {
-                    return true;
-                }
-                JavaType.Class classType = TypeUtils.asClass(classDecl.getType());
-                if (classType == null) {
-                    // Type attribution failed — cannot inspect interface annotations.
-                    // Warn when the class declares implemented interfaces, since one of them
-                    // might carry @Remote and we cannot verify it.
-                    if (classDecl.getImplements() != null && !classDecl.getImplements().isEmpty()) {
-                        J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
-                        log.warn("Could not resolve type for '{}' in {}: " +
-                                        "cannot verify @Remote — migrating to @Service, please verify manually",
-                                classDecl.getSimpleName(), cu.getSourcePath());
-                    }
-                    return false;
-                }
-                return implementsRemoteInterface(classType);
-            }
-
-            // Walks the superclass chain and each interface's own superinterface hierarchy so that
-            // @Remote is detected regardless of whether it appears directly on the implemented
-            // interface, through an abstract base class, or via interface extension
-            // (e.g. ServiceRemote extends @Remote BaseRemote).
-            private boolean implementsRemoteInterface(JavaType.Class classType) {
-                if (classType == null || "java.lang.Object".equals(classType.getFullyQualifiedName())) {
-                    return false;
-                }
-                if (classType.getInterfaces().stream().anyMatch(this::isRemoteInterface)) {
-                    return true;
-                }
-                return implementsRemoteInterface(TypeUtils.asClass(classType.getSupertype()));
-            }
-
-            // Checks whether an interface type (or any of its superinterfaces) carries @Remote.
-            private boolean isRemoteInterface(JavaType.FullyQualified iface) {
-                if (iface == null) {
-                    return false;
-                }
-                if (iface.getAnnotations().stream()
-                        .anyMatch(a -> "javax.ejb.Remote".equals(a.getFullyQualifiedName()))) {
-                    return true;
-                }
-                return iface.getInterfaces().stream().anyMatch(this::isRemoteInterface);
-            }
-
             private J.Annotation ejbAnnotation(J.ClassDeclaration cd, AnnotationMatcher matcher) {
                 return cd.getLeadingAnnotations().stream()
                         .filter(matcher::matches)
@@ -232,6 +213,68 @@ public class MigrateStatelessSessionBeans extends Recipe {
                         .orElse(null);
             }
         };
+    }
+
+    // Returns true if the class/interface declaration is directly annotated with @Remote, or
+    // implements a @Remote interface (directly, through a superclass, or via superinterface
+    // inheritance). Package-visible so InlineLocalBeanInterfaces can apply the same skip semantics.
+    static boolean isRemoteBean(J.ClassDeclaration classDecl, Cursor cursor) {
+        if (classDecl.getLeadingAnnotations().stream().anyMatch(REMOTE_MATCHER::matches)) {
+            return true;
+        }
+        JavaType.Class classType = TypeUtils.asClass(classDecl.getType());
+        if (classType == null) {
+            // Type attribution failed — cannot inspect interface annotations.
+            // Warn when the class declares implemented interfaces, since one of them
+            // might carry @Remote and we cannot verify it.
+            if (classDecl.getImplements() != null && !classDecl.getImplements().isEmpty()) {
+                J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
+                log.warn("Could not resolve type for '{}' in {}: " +
+                                "cannot verify @Remote — migrating to @Service, please verify manually",
+                        classDecl.getSimpleName(), cu.getSourcePath());
+            }
+            return false;
+        }
+        return implementsRemoteInterface(classType);
+    }
+
+    // Walks the superclass chain and each interface's own superinterface hierarchy so that
+    // @Remote is detected regardless of whether it appears directly on the implemented
+    // interface, through an abstract base class, or via interface extension
+    // (e.g. ServiceRemote extends @Remote BaseRemote).
+    static boolean implementsRemoteInterface(JavaType.Class classType) {
+        if (classType == null || "java.lang.Object".equals(classType.getFullyQualifiedName())) {
+            return false;
+        }
+        if (classType.getInterfaces().stream().anyMatch(MigrateStatelessSessionBeans::isRemoteInterface)) {
+            return true;
+        }
+        return implementsRemoteInterface(TypeUtils.asClass(classType.getSupertype()));
+    }
+
+    // Checks whether an interface type (or any of its superinterfaces) carries @Remote.
+    static boolean isRemoteInterface(JavaType.FullyQualified iface) {
+        if (iface == null) {
+            return false;
+        }
+        if (iface.getAnnotations().stream()
+                .anyMatch(a -> "javax.ejb.Remote".equals(a.getFullyQualifiedName()))) {
+            return true;
+        }
+        return iface.getInterfaces().stream().anyMatch(MigrateStatelessSessionBeans::isRemoteInterface);
+    }
+
+    // A bare @Local (no value) is always safe to strip - there's no interface reference to
+    // preserve. An interface's own @Local (always bare in practice) is also always safe: removing
+    // EJB metadata from the interface being annotated is the whole point of that call site. A
+    // class-level @Local({X.class, ...}) is only safe once none of its listed values still resolve
+    // to a genuine interface - see removeLocalAndLocalBeanAnnotations's javadoc for why.
+    private static boolean isSafeToStripLocal(J.ClassDeclaration cd, J.Annotation localAnnotation) {
+        if (cd.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
+            return true;
+        }
+        List<JavaType.FullyQualified> values = InlineLocalBeanInterfaces.classLiteralTypes(localAnnotation);
+        return values.stream().noneMatch(fq -> fq.getKind() == JavaType.FullyQualified.Kind.Interface);
     }
 
     // Adds a TODO line comment before the class declaration.
