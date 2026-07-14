@@ -9,8 +9,14 @@ description: >-
   with a TODO comment too but still adds @Autowired unless the declared type is a @Remote business
   interface (or unresolvable); skips constructor-level @EJB (EJB does not support constructor
   injection).
+  Inlines @Local business interfaces that have exactly one concrete, non-@Remote implementor:
+  retypes every field/parameter/return-type reference to the implementor class, strips the
+  implements clause, and deletes the interface once it has zero remaining references; reference
+  sites that cannot be resolved to the implementor from their own module are left untouched and
+  flagged with a TODO comment instead, and the interface is not deleted in that case.
   Replaces @Stateless/@Singleton with @Service (preserving the name string-literal attribute);
-  removes @Local, @LocalBean, and @Startup from bean classes and interfaces; flags mappedName,
+  removes @Local, @LocalBean, and @Startup from bean classes and interfaces (including classes
+  without @Stateless/@Singleton themselves, e.g. an abstract base class); flags mappedName,
   description, non-literal name, and @Startup removal with a search result comment; skips beans
   that implement a @Remote interface (directly, through a superclass, or via superinterface
   inheritance) and marks them for manual migration.
@@ -29,22 +35,27 @@ recipeList:
   #    non-migratable attributes flagged with TODO; constructor @EJB skipped)
   - hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateEjbAnnotations
 
-  # 2. Replace @Stateless/@Singleton with @Service; remove @Local/@LocalBean/@Startup from classes and
+  # 2. Inline @Local business interfaces with exactly one concrete, non-@Remote implementor: retype
+  #    references to the implementor class, strip the implements clause, delete the interface once
+  #    unused. Must run before step 3 strips the @Local annotations this step's scan relies on.
+  - hu.dojcsak.openrewrite.recipe.jee.ejb.InlineLocalBeanInterfaces
+
+  # 3. Replace @Stateless/@Singleton with @Service; remove @Local/@LocalBean/@Startup from classes and
   #    interfaces; flag mappedName/description/@Startup/non-literal name; skip @Remote beans
   - hu.dojcsak.openrewrite.recipe.jee.ejb.MigrateStatelessSessionBeans
 
-  # 3. Replace javax.inject.@Inject with @Autowired
+  # 4. Replace javax.inject.@Inject with @Autowired
   - org.openrewrite.java.ChangeType:
       oldFullyQualifiedTypeName: javax.inject.Inject
       newFullyQualifiedTypeName: org.springframework.beans.factory.annotation.Autowired
 
-  # 4. Add @Transactional to @Service classes as replacement for EJB CMT
+  # 5. Add @Transactional to @Service classes as replacement for EJB CMT
   - hu.dojcsak.openrewrite.recipe.jee.ejb.AddTransactionalToServiceBeans
 
-  # 5. Remove EJB Maven packaging configuration
+  # 6. Remove EJB Maven packaging configuration
   - hu.dojcsak.openrewrite.recipe.jee.ejb.RemoveEjbMavenPackaging
 
-  # 6. Remove EJB build dependencies
+  # 7. Remove EJB build dependencies
   - org.openrewrite.java.dependencies.RemoveDependency:
       groupId: javax
       artifactId: javaee-api
@@ -58,18 +69,18 @@ recipeList:
       groupId: com.oracle.weblogic
       artifactId: javax.javaee-api
 
-  # 7. Add Spring Boot 2.7.x core starter (only if javax.ejb.* is used)
+  # 8. Add Spring Boot 2.7.x core starter (only if javax.ejb.* is used)
   - hu.dojcsak.openrewrite.recipe.jee.ejb.AppendDependency:
       groupId: org.springframework.boot
       artifactId: spring-boot-starter
       version: 2.7.18
       onlyIfUsing: "javax.ejb.*"
 
-  # 8. Add spring-tx for EJB session bean modules without JPA
+  # 9. Add spring-tx for EJB session bean modules without JPA
   # (spring-boot-starter-data-jpa already includes spring-tx transitively; decision is per module)
   - hu.dojcsak.openrewrite.recipe.jee.ejb.AddSpringTxUnlessJpaPresent
 
-  # 9. Add Spring Boot JPA starter (only when javax.persistence.* types are used)
+  # 10. Add Spring Boot JPA starter (only when javax.persistence.* types are used)
   - hu.dojcsak.openrewrite.recipe.jee.ejb.AppendDependency:
       groupId: org.springframework.boot
       artifactId: spring-boot-starter-data-jpa

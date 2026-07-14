@@ -309,6 +309,80 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
     }
 
     @Test
+    void removesBareLocalAnnotationFromAbstractBaseClassWithoutStatelessOrSingleton() {
+        // A bare @Local (no value) has no interface reference to preserve, so it's always safe to
+        // remove regardless of whether @Stateless/@Singleton is present.
+        rewriteRun(
+          java(
+                  """
+                          import javax.ejb.Local;
+
+                          @Local
+                          abstract class OrderServiceBase {
+                          }
+                          """,
+                  """
+                          abstract class OrderServiceBase {
+                          }
+                          """
+          )
+        );
+    }
+
+    @Test
+    void preservesClassLevelLocalAnnotationWhenValueStillResolvesToInterface() {
+        // Andromda-style pattern: @Local({FooLocal.class}) sits on an abstract base class that
+        // itself never carries @Stateless/@Singleton (only the concrete Bean subclass does). As
+        // long as OrderServiceLocal is still a genuine interface here (e.g. InlineLocalBeanInterfaces
+        // hasn't run, or deliberately left it un-inlined because some other reference to it
+        // couldn't be resolved cross-module), the annotation is still accurate metadata and must be
+        // left untouched rather than silently destroyed.
+        rewriteRun(
+          java(
+                  """
+                          interface OrderServiceLocal {}
+                          """
+          ),
+          java(
+                  """
+                          import javax.ejb.Local;
+
+                          @Local({OrderServiceLocal.class})
+                          abstract class OrderServiceBase {
+                          }
+                          """
+          )
+        );
+    }
+
+    @Test
+    void removesClassLevelLocalAnnotationOnceValueNoLongerResolvesToInterface() {
+        // Once the class-literal value has already been retyped to a concrete class (e.g. by
+        // InlineLocalBeanInterfaces, after it fully inlined the interface), the annotation is stale
+        // and safe to remove - this is the scenario the two recipes are meant to compose into.
+        rewriteRun(
+          java(
+                  """
+                          class OrderServiceBean {}
+                          """
+          ),
+          java(
+                  """
+                          import javax.ejb.Local;
+
+                          @Local({OrderServiceBean.class})
+                          abstract class OrderServiceBase {
+                          }
+                          """,
+                  """
+                          abstract class OrderServiceBase {
+                          }
+                          """
+          )
+        );
+    }
+
+    @Test
     void removesLocalBeanAnnotationFromInterface() {
         rewriteRun(
           java(
