@@ -137,4 +137,65 @@ class MigrateStatelessEjbTest implements RewriteTest {
                 )
         );
     }
+
+    // A manually indented multi-line extends/implements layout (common in Andromda-generated EJB
+    // code) should survive the full composite migration unchanged. A real-world instance of this
+    // recipe suite losing that indentation (root-caused to JavaTemplate.apply()'s default autoFormat
+    // pass in MigrateStatelessSessionBeans/AddTransactionalToServiceBeans, now fixed by snapshotting
+    // and restoring cd.getPadding().getExtends()/getImplements() around those calls) was confirmed via
+    // the actual rewrite-maven-plugin execution path against a real multi-module project - it is not
+    // reproducible under this test harness's plain JavaParser, so this test documents the desired
+    // end-to-end property rather than guarding the specific regression that was found and fixed.
+    @Test
+    void preservesExtendsImplementsIndentationAcrossFullMigration() {
+        rewriteRun(
+                java(
+                        """
+                                import javax.ejb.Local;
+
+                                @Local
+                                public interface FooLocal {
+                                    void doWork();
+                                }
+                                """,
+                        (String) null
+                ),
+                java(
+                        """
+                                public class FooBase {
+                                }
+                                """
+                ),
+                java(
+                        """
+                                public interface FooOtherInterface {
+                                }
+                                """
+                ),
+                java(
+                        """
+                                import javax.ejb.Stateless;
+
+                                @Stateless
+                                public class FooBean
+                                        extends FooBase
+                                        implements FooLocal, FooOtherInterface {
+                                    public void doWork() {}
+                                }
+                                """,
+                        """
+                                import org.springframework.stereotype.Service;
+                                import org.springframework.transaction.annotation.Transactional;
+
+                                @Service
+                                @Transactional
+                                public class FooBean
+                                        extends FooBase
+                                        implements FooOtherInterface {
+                                    public void doWork() {}
+                                }
+                                """
+                )
+        );
+    }
 }
