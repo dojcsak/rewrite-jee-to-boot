@@ -893,4 +893,50 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
           )
         );
     }
+
+    // A manually indented multi-line extends/implements layout (common in Andromda-generated EJB
+    // code) should survive @Service insertion unchanged. Confirmed via the real rewrite-maven-plugin
+    // execution path (against a real multi-module project) that JavaTemplate.apply()'s default
+    // autoFormat pass could otherwise collapse this onto an unindented single line even though only a
+    // leading annotation is being added - fixed by snapshotting cd.getPadding().getExtends()/
+    // getImplements() before the apply() call above and restoring them after. That regression is not
+    // reproducible under this test harness's plain JavaParser, so this test documents the desired
+    // property rather than guarding the specific defect.
+    @Test
+    void preservesExtendsImplementsIndentationWhenAddingService() {
+        rewriteRun(
+          java(
+                  """
+                          public class OrderServiceBase {
+                          }
+                          """
+          ),
+          java(
+                  """
+                          public interface OrderServiceInterface {
+                          }
+                          """
+          ),
+          java(
+                  """
+                          import javax.ejb.Stateless;
+
+                          @Stateless
+                          public class OrderService
+                                  extends OrderServiceBase
+                                  implements OrderServiceInterface {
+                          }
+                          """,
+                  """
+                          import org.springframework.stereotype.Service;
+
+                          @Service
+                          public class OrderService
+                                  extends OrderServiceBase
+                                  implements OrderServiceInterface {
+                          }
+                          """
+          )
+        );
+    }
 }

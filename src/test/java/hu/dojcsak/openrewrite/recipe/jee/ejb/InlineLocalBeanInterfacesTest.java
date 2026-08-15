@@ -638,4 +638,56 @@ class InlineLocalBeanInterfacesTest implements RewriteTest {
         // moduleRoot-fallback logic (both of which fail here) must still report unresolvable.
         assertThat(InlineLocalBeanInterfaces.isResolvableFrom(referencingCu, "pkg.FooLocal", "pkg.FooBean", acc)).isFalse();
     }
+
+    // A manually indented multi-line extends/implements layout (common in Andromda-generated EJB
+    // code) should survive interface removal from the implements clause unchanged. Note: a real-world
+    // instance of this recipe suite losing that indentation was confirmed via the actual
+    // rewrite-maven-plugin execution path against a real multi-module project, not reproducible under
+    // this test harness's plain JavaParser - so this test documents the desired property rather than
+    // proving root cause or guarding the specific regression that was found and fixed elsewhere
+    // (MigrateStatelessSessionBeans/AddTransactionalToServiceBeans's JavaTemplate.apply() calls).
+    @Test
+    void preservesExtendsImplementsIndentationWhenStrippingLocalInterface() {
+        rewriteRun(
+                java(
+                        """
+                                import javax.ejb.Local;
+
+                                @Local
+                                public interface FooLocal {
+                                    void doWork();
+                                }
+                                """,
+                        (String) null
+                ),
+                java(
+                        """
+                                public class FooBase {
+                                }
+                                """
+                ),
+                java(
+                        """
+                                public interface FooOtherInterface {
+                                }
+                                """
+                ),
+                java(
+                        """
+                                public class FooBean
+                                        extends FooBase
+                                        implements FooLocal, FooOtherInterface {
+                                    public void doWork() {}
+                                }
+                                """,
+                        """
+                                public class FooBean
+                                        extends FooBase
+                                        implements FooOtherInterface {
+                                    public void doWork() {}
+                                }
+                                """
+                )
+        );
+    }
 }
