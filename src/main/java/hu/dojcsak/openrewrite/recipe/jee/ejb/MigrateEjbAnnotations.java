@@ -14,6 +14,7 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
@@ -134,12 +135,18 @@ public class MigrateEjbAnnotations extends Recipe {
                             "TODO: " + ejbAnnotationText + " could not be automatically migrated");
                 }
 
+                // JavaTemplate.apply()'s default autoFormat pass can reformat the leading comment
+                // block this declaration carries (e.g. Javadoc/commented-out code above @EJB), even
+                // though only a leading annotation is being swapped in here - restore the
+                // declaration's own top-level prefix verbatim afterward.
+                Space mPrefixBeforeAutowired = m.getPrefix();
                 m = JavaTemplate.builder("@Autowired")
                         .imports("org.springframework.beans.factory.annotation.Autowired")
                         .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-beans"))
                         .build()
                         .apply(getCursor(), m.getCoordinates().addAnnotation(
                                 Comparator.comparing(J.Annotation::getSimpleName)));
+                m = m.withPrefix(mPrefixBeforeAutowired);
                 maybeAddImport("org.springframework.beans.factory.annotation.Autowired", false);
 
                 if (hasLookup) {
@@ -158,12 +165,14 @@ public class MigrateEjbAnnotations extends Recipe {
                     if (beanNameSource == null) {
                         beanNameSource = "\"" + beanName.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
                     }
+                    Space mPrefixBeforeQualifier = m.getPrefix();
                     m = JavaTemplate.builder("@Qualifier(" + beanNameSource + ")")
                             .imports("org.springframework.beans.factory.annotation.Qualifier")
                             .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-beans"))
                             .build()
                             .apply(getCursor(), m.getCoordinates().addAnnotation(
                                     Comparator.comparing(J.Annotation::getSimpleName)));
+                    m = m.withPrefix(mPrefixBeforeQualifier);
                     maybeAddImport("org.springframework.beans.factory.annotation.Qualifier", false);
                 }
 
@@ -214,12 +223,18 @@ public class MigrateEjbAnnotations extends Recipe {
                             "TODO: " + ejbAnnotationText + " could not be automatically migrated");
                 }
 
+                // JavaTemplate.apply()'s default autoFormat pass can reformat the leading comment
+                // block this declaration carries (e.g. Javadoc/commented-out code above @EJB), even
+                // though only a leading annotation is being swapped in here - restore the
+                // declaration's own top-level prefix verbatim afterward.
+                Space mvPrefixBeforeAutowired = mv.getPrefix();
                 mv = JavaTemplate.builder("@Autowired")
                         .imports("org.springframework.beans.factory.annotation.Autowired")
                         .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-beans"))
                         .build()
                         .apply(getCursor(), mv.getCoordinates().addAnnotation(
                                 Comparator.comparing(J.Annotation::getSimpleName)));
+                mv = mv.withPrefix(mvPrefixBeforeAutowired);
                 maybeAddImport("org.springframework.beans.factory.annotation.Autowired", false);
 
                 if (hasLookup) {
@@ -238,12 +253,14 @@ public class MigrateEjbAnnotations extends Recipe {
                     if (beanNameSource == null) {
                         beanNameSource = "\"" + beanName.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
                     }
+                    Space mvPrefixBeforeQualifier = mv.getPrefix();
                     mv = JavaTemplate.builder("@Qualifier(" + beanNameSource + ")")
                             .imports("org.springframework.beans.factory.annotation.Qualifier")
                             .javaParser(JavaParser.fromJavaVersion().classpathFromResources(ctx, "spring-beans"))
                             .build()
                             .apply(getCursor(), mv.getCoordinates().addAnnotation(
                                     Comparator.comparing(J.Annotation::getSimpleName)));
+                    mv = mv.withPrefix(mvPrefixBeforeQualifier);
                     maybeAddImport("org.springframework.beans.factory.annotation.Qualifier", false);
                 }
 

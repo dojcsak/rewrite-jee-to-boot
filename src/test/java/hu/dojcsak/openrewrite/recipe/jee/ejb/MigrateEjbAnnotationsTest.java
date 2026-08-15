@@ -1005,4 +1005,117 @@ class MigrateEjbAnnotationsTest implements RewriteTest {
           )
         );
     }
+
+    // A field preceded by a large leading comment block (Javadoc + commented-out code + a
+    // section-divider comment, as commonly left behind by Andromda code generation) should have
+    // that block's formatting preserved untouched when @EJB is replaced with @Autowired.
+    // JavaTemplate.apply()'s autoFormat pass would otherwise reflow one comment's indentation even
+    // though only a leading annotation is being swapped - fixed by snapshotting mv.getPrefix()
+    // before the apply() call above and restoring it after. Unlike the sibling extends/implements
+    // formatting bug (fixed in a547acd), this one DOES reproduce under this suite's plain
+    // JavaParser harness - confirmed by running this test against the pre-fix code and observing
+    // it fail with the exact real-world corruption - so this test is genuine regression protection,
+    // not just documentation of intent.
+    @Test
+    void preservesLeadingCommentIndentationWhenReplacingEjbField() {
+        rewriteRun(
+          java("interface PaymentService {}"),
+          java(
+                  """
+                          import javax.ejb.EJB;
+
+                          class OrderService {
+                              /**
+                               * Some note
+                               */
+                          //    @Deprecated(since = "1.0")
+                          //    private String legacyField;
+
+                              // ------ Injection ------
+
+                              /**
+                               * Inject payment service
+                               */
+                              @EJB
+                              private PaymentService paymentService;
+                          }
+                          """,
+                  """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
+                          class OrderService {
+                              /**
+                               * Some note
+                               */
+                          //    @Deprecated(since = "1.0")
+                          //    private String legacyField;
+
+                              // ------ Injection ------
+
+                              /**
+                               * Inject payment service
+                               */
+                              @Autowired
+                              private PaymentService paymentService;
+                          }
+                          """
+          )
+        );
+    }
+
+    // Same as above but for setter injection.
+    @Test
+    void preservesLeadingCommentIndentationWhenReplacingEjbSetter() {
+        rewriteRun(
+          java("interface PaymentService {}"),
+          java(
+                  """
+                          import javax.ejb.EJB;
+
+                          class OrderService {
+                              private PaymentService paymentService;
+
+                              /**
+                               * Some note
+                               */
+                          //    @Deprecated(since = "1.0")
+                          //    private String legacyField;
+
+                              // ------ Injection ------
+
+                              /**
+                               * Inject payment service
+                               */
+                              @EJB
+                              public void setPaymentService(PaymentService paymentService) {
+                                  this.paymentService = paymentService;
+                              }
+                          }
+                          """,
+                  """
+                          import org.springframework.beans.factory.annotation.Autowired;
+
+                          class OrderService {
+                              private PaymentService paymentService;
+
+                              /**
+                               * Some note
+                               */
+                          //    @Deprecated(since = "1.0")
+                          //    private String legacyField;
+
+                              // ------ Injection ------
+
+                              /**
+                               * Inject payment service
+                               */
+                              @Autowired
+                              public void setPaymentService(PaymentService paymentService) {
+                                  this.paymentService = paymentService;
+                              }
+                          }
+                          """
+          )
+        );
+    }
 }
