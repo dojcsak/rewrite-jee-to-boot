@@ -184,17 +184,31 @@ public class MigrateStatelessSessionBeans extends Recipe {
                 if (!hasLocal && !hasLocalBean) {
                     return cd;
                 }
-                // In CRLF files the first annotation's prefix is "" (the \r\n before it lives in the
-                // class declaration prefix). After removing all annotations the class prefix's trailing
-                // \r\n and the first modifier's \r\n combine into a blank line. Detect this up front.
-                boolean firstAnnotationHasNoNewline = !cd.getLeadingAnnotations().isEmpty() &&
-                        !cd.getLeadingAnnotations().get(0).getPrefix().getWhitespace().contains("\n");
+                // In CRLF files (and in some comment-adjacent layouts) the first leading annotation's own
+                // prefix carries no newline - the \r\n/\n that visually separates it from whatever precedes
+                // it lives elsewhere (the class declaration's prefix, or a preceding comment's own suffix).
+                // If that first annotation is one of the ones being removed, its "missing" leading newline
+                // must be donated to whatever becomes the new first token - either the next surviving
+                // annotation, or (if none remain) the first modifier / class keyword - otherwise the newline
+                // that used to separate it from what follows doubles up into a blank line.
+                J.Annotation originalFirst = cd.getLeadingAnnotations().isEmpty() ? null : cd.getLeadingAnnotations().get(0);
+                boolean firstAnnotationRemoved = originalFirst != null &&
+                        !originalFirst.getPrefix().getWhitespace().contains("\n") &&
+                        ((hasLocal && localMatcher.matches(originalFirst)) ||
+                                (hasLocalBean && localBeanMatcher.matches(originalFirst)));
                 List<J.Annotation> annotations = new ArrayList<>(cd.getLeadingAnnotations());
                 annotations.removeIf(a ->
                         (hasLocal && localMatcher.matches(a)) || (hasLocalBean && localBeanMatcher.matches(a)));
                 cd = cd.withLeadingAnnotations(annotations);
-                if (annotations.isEmpty() && firstAnnotationHasNoNewline) {
-                    cd = stripOneLeadingNewlineFromFirstToken(cd);
+                if (firstAnnotationRemoved) {
+                    if (annotations.isEmpty()) {
+                        cd = stripOneLeadingNewlineFromFirstToken(cd);
+                    } else {
+                        List<J.Annotation> stripped = new ArrayList<>(annotations);
+                        J.Annotation newFirst = stripped.get(0);
+                        stripped.set(0, newFirst.withPrefix(stripOneLeadingNewline(newFirst.getPrefix())));
+                        cd = cd.withLeadingAnnotations(stripped);
+                    }
                 }
                 if (hasLocal) {
                     maybeRemoveImport("javax.ejb.Local");

@@ -330,6 +330,59 @@ class MigrateStatelessSessionBeansTest implements RewriteTest {
     }
 
     @Test
+    void avoidsBlankLineWhenAnotherAnnotationSurvivesLocalRemovalCrlf() {
+        // Regression test: when @Local is the first leading annotation in a CRLF file and another
+        // annotation survives after it (e.g. one added by an earlier, separately-run recipe), @Local's
+        // own prefix carries no newline (the CRLF quirk already covered by the Javadoc CRLF test
+        // above). The newline-donation fix must move onto the surviving annotation (@Keep), not just
+        // fire when the list becomes empty - otherwise a blank line appears before @Keep.
+        String NL = "\r\n";
+        String input =
+                "import javax.ejb.Local;" + NL +
+                NL +
+                "@Local" + NL +
+                "@Keep" + NL +
+                "abstract class OrderServiceBase {" + NL +
+                "}" + NL;
+        String expected =
+                "@Keep" + NL +
+                "abstract class OrderServiceBase {" + NL +
+                "}" + NL;
+        rewriteRun(
+          java("@interface Keep {\r\n}\r\n"),
+          java(input, expected)
+        );
+    }
+
+    @Test
+    void avoidsBlankLineBetweenLeadingCommentAndSurvivingAnnotationAfterLocalRemoval() {
+        // Regression test for the exact real-world bug shape: a comment injected by an earlier,
+        // separately-run recipe sits directly above @Local (no blank line between them), and another
+        // annotation added by yet another earlier recipe pass (simulated here by @Keep) survives
+        // @Local's removal.
+        rewriteRun(
+          java("@interface Keep {\n}\n"),
+          java(
+                  """
+                          import javax.ejb.Local;
+
+                          // TODO: manual review required
+                          @Local
+                          @Keep
+                          abstract class OrderServiceBase {
+                          }
+                          """,
+                  """
+                          // TODO: manual review required
+                          @Keep
+                          abstract class OrderServiceBase {
+                          }
+                          """
+              )
+        );
+    }
+
+    @Test
     void preservesClassLevelLocalAnnotationWhenValueStillResolvesToInterface() {
         // Andromda-style pattern: @Local({FooLocal.class}) sits on an abstract base class that
         // itself never carries @Stateless/@Singleton (only the concrete Bean subclass does). As
