@@ -14,7 +14,7 @@ version = "1.0.0-SNAPSHOT"
 description = "JEE to Spring Boot rewrite recipes"
 
 recipeDependencies {
-    parserClasspath("org.jspecify:jspecify:1.0.0")
+    parserClasspath("org.jspecify:jspecify:1.0.1")
     parserClasspath("javax.ejb:javax.ejb-api:3.2.2")
     parserClasspath("javax.inject:javax.inject:1")
 }
